@@ -2,14 +2,14 @@ services:
   # ─── Backend (Laravel 12 + PHP 8.3 + Apache) ───
   backend:
     build:
-      context: ./dt-time-charging-backend
+      context: ./backend
       dockerfile: Dockerfile
     container_name: tc-backend
     ports:
       - "8000:80"
     volumes:
       - backend-storage:/var/www/html/storage
-      - ./dt-time-charging-backend/.env:/var/www/html/.env
+      - ./backend/.env:/var/www/html/.env
     environment:
       - APP_NAME=Laravel
       - APP_ENV=local
@@ -33,7 +33,7 @@ services:
   # ─── Frontend (React 18 + Vite + Nginx) ───
   frontend:
     build:
-      context: ./dt-time-charging-frontend
+      context: ./frontend
       dockerfile: Dockerfile
     container_name: tc-frontend
     ports:
