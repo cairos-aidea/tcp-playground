@@ -66,8 +66,11 @@ services:
 
 volumes:
   mysql-data:
+    external: true
+    name: timechargingproject_mysql-data
   backend-storage:
-
+    external: true
+    name: timechargingproject_backend-storage
 
 networks:
   tc-network:
