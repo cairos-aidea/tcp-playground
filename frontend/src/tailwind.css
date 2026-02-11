@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/* ===== Custom Theme (migrated from tailwind.config.js) ===== */
+@theme {
+  --color-primary: #323332;
+  --color-primary-hover: #4d4e4c;
+  --color-secondary: #f25c05;
+  --color-secondary-hover: #d24f04;
+  --color-muted: #999a9a;
+  --color-muted-hover: #7f8080;
+
+  --font-sans: 'Inter', sans-serif;
+
+  --spacing-128: 32rem;
+  --spacing-144: 36rem;
+
+  --radius-aidea-xs: 0.25rem 0.25rem 0rem 0.25rem;
+  --radius-aidea-sm: 0.5rem 0.5rem 0rem 0.5rem;
+  --radius-aidea-md: 0.75rem 0.75rem 0rem 0.75rem;
+  --radius-aidea-lg: 1rem 1rem 0rem 1rem;
+
+  --font-size-xxs: 0.625rem;
+  --font-size-xxs--line-height: 0.875rem;
+
+  --animate-zoom-fade: zoomFade 2s ease-in-out infinite;
+}
+
+@keyframes zoomFade {
+  0%, 100% { transform: scale(1);    opacity: 1;  }
+  50%      { transform: scale(1.25); opacity: 0.5; }
+}

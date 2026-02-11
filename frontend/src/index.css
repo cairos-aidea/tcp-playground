@@ -1,0 +1,185 @@
+@import "./tailwind.css";
+
+*:focus {
+  outline: none !important;
+  border: 0px !important;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  width: 8px;
+  /* Scroll width */
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: #111;
+  /* Match neutral-900 */
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: #3a3a3a;
+  /* Match neutral-700 */
+  border-radius: 12px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: #525252;
+  /* Brighter on hover */
+}
+
+/* Firefox support */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #3a3a3a #111;
+}
+
+/* highlight background only in the day grid */
+.rbc-day-slot .highlight-slot {
+  background-color: #ebf3fa !important;
+  border-top: none !important;
+  /* remove slot dividers */
+}
+
+/* .rbc-now div span{
+  background-color: #000;
+  color: #fff;
+  border-radius: 100%;
+} */
+
+.event-with-handles .custom-resize-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.9);
+  border: 2px solid rgba(0, 0, 0, 0.3);
+  cursor: ns-resize;
+  z-index: 10;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Top handle - positioned near left */
+.event-with-handles .top-handle {
+  top: -6px;
+  left: 8px;
+}
+
+/* Bottom handle - positioned near right */
+.event-with-handles .bottom-handle {
+  bottom: -6px;
+  right: 8px;
+}
+
+/* Hover effect for better interaction feedback */
+.event-with-handles .custom-resize-handle:hover {
+  background-color: rgba(255, 255, 255, 1);
+  border-color: rgba(0, 0, 0, 0.6);
+  transform: scale(1.2);
+}
+
+
+/* remove highlight from gutter */
+.rbc-time-gutter .highlight-slot {
+  background-color: inherit !important;
+  border-top: none !important;
+}
+
+.rbc-day-slot .highlight-slot-lunch {
+  /* background-color: rgba(68, 68, 68, 0.2) !important; */
+  background-color: transparent !important;
+}
+
+/* Add broken border top at 11:30 */
+.rbc-day-slot .highlight-slot-lunch.highlight-slot-lunch-top {
+  border-top: 2px dashed #666 !important;
+  z-index: 10;
+}
+
+/* Add broken border bottom at 12:30 */
+.rbc-day-slot .highlight-slot-lunch.highlight-slot-lunch-bottom {
+  border-bottom: 2px dashed #666 !important;
+  z-index: 10;
+}
+
+.rbc-time-view .rbc-allday-cell {
+  box-sizing: border-box !important;
+  min-height: 0 !important;
+  height: auto !important;
+}
+
+.react-select__input {
+  color: #444 !important;
+  border: transparent !important;
+  box-shadow: none !important;
+}
+
+.rbc-event {
+  padding: 1px 5px !important;
+  background-color: transparent !important;
+  border: none;
+}
+
+.rbc-show-more {
+  background-color: #f0f0f0 !important;
+  color: #444 !important;
+  padding: 1px 4px !important;
+  margin: 1px 3px !important;
+  border-radius: 2px !important;
+  font-size: 12px !important;
+  border: 1px solid #ccc !important;
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.rbc-day-slot .rbc-event {
+  border: none !important;
+  background-color: transparent !important;
+}
+
+.rbc-event-label {
+  display: none !important;
+}
+
+.rbc-month-row {
+  overflow: unset !important;
+  display: block !important;
+}
+
+.rbc-month-view {
+  border: unset !important;
+}
+
+.rbc-month-header {
+  position: sticky;
+  top: 64.89px;
+  background: white;
+  z-index: 10;
+}
+
+.rbc-row-segment {
+  display: block !important;
+  margin-bottom: 2px;
+}
+
+.rbc-event-stack {
+  margin: 2px 0;
+}
+
+.rbc-event.rbc-selected,
+.rbc-day-slot .rbc-selected.rbc-background-event,
+.rbc-event.rbc-selected,
+.rbc-day-slot .rbc-selected.rbc-background-event {
+  background: transparent !important;
+}
+
+
+/* ETF TABLE STYLES */
+.stage-col {
+  /* min-width: 100px; */
+  max-width: 100px;
+}
+
+/* .no-padding-cells th,
+.no-padding-cells td {
+  padding: 0;
+} */

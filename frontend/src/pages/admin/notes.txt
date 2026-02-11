@@ -1,0 +1,286 @@
+
+1. Regular hours only = regular working hours time charges that equates to 8 hours and without OT
+2. Regular hours only, but it includes the 1 hour break time charge = there are instances na isasama ang lunch break sa 8 hours, but it is still equates to 8 regular working hours and without OT
+3. Regular hours with OT = regular working hours time charges that equates to 8 hours and with OT
+4. Regular hours with OT, but it includes the 1 hour break time charge = there are instances na isasama ang lunch break sa 8 hours but it is still equates to 8 regular working hours and with OT
+5. Early time in, but not OT = there are instances ilalagay ang early time but still considered it as regular hour, so the earliest time in is 7am 
+6. Early time in, but it is an OT = split the time charge; OT dapat yung time until 7am.
+7. Editing a time charge na di mag-ooverlap sa ibang time charge = no changes 
+8. Editing a time charge na mag-ooverlap sa ibang charge = *the overlapped time charge should be deleted
+9. In filing an evening OT, there should be a minimum hour to be accepted as that as OT
+
+
+Create me a react jsx component that has time charge calendar capabilities out of this: 
+
+Libraries:
+-DndCalendar from react-big-calendar
+-flowbite vanilla
+-moment
+-icons from lucide-react
+
+This is the process:
+A calendar that can be clickable on a slot. If clicked, show a modal that has dropdown of the ff:
+- Project Internal, Project External or Departmental projects, Absent or Leave or Official Business
+- List of Project Internals, Projects External or Departmental project ACTIVITES
+- Start time input
+- End time inpuut
+- Is OT? radio button, if yes add a checkbox, "next day OT"
+- Submit button
+- Cancel button
+
+This will outputs event to the calendar. 
+
+Here's the conditions: 
+1. This is a time charge, Office working hours is from 7am to 7pm. Flexible time.
+2. Regular working day is 8 hours. 
+3. Outside the office working hours are considered overtime. But since it's flexible, overtime can start as soon as 4pm only if total of 8 hours of regular working day time charge and overtime time_charge hour is minimum 1 hour are met.
+
+
+4. Trigger is to submit a event:
+
+Check if the submitting_event day is in weekday:
+  if true:
+    Check if the submitting_event day is in holiday:
+      if false:
+        Check if the submitting_event is a time_charge:
+          if true: 
+            Check if the submitting_event is a regular time_charge:
+              if true: 
+                Check if the total events; time_charges, absent, leaves, official business hours in the day > 0:
+                  if true:
+                    Check the submitting regular time_charge start_time and end_time if it will overlap to any of the time_charges, absent, leaves, official business start_time and end_time of the day:
+                      if true: 
+                        prompt the user to fix the submitting regular time_charge start_time and end_time, return
+                      if false:
+                        get all events of the day of the submitting regular time_charge, check if the total hours of the time_charges hours + absent hours + leave hours + official business hours + submitting time_charge hours >= 8:
+                          if true:
+                            run down all the regular time_charges, absent, leaves, official business of the day + submitting regular time_charge start_time and end_time, then check if there is an hour interval between them:
+                              if true:
+                                check if the total hours of time_charges, absent, leaves, official business of the day + submitting regular time_charge hours >= 8:
+                                  if true:
+                                    prompt the user to choose whether he will adjust the time or the system will automatically adjust the end_time of the submitting regular time_charge:
+                                      if user choose manually adjust the time:
+                                        return to check if the total hours of time_charges, absent, leaves, official business of the day + submitting regular time_charge hours > 8
+                                      else:
+                                        get the start_time and end_time of the submitting regular time_charge, convert it to hours and adjust it to make the total hours of the day together with other time_charges, absent, leaves, official business total to 8 hours exact
+                                          if true:
+                                            Check if the submitting event is between the 7am to 7pm:
+                                              if true: 
+                                                insert time_charge as regular time_charge ( 1 data row )
+                                              if false:
+                                                prompt user to adjust the time 
+                                          if false: 
+                                            return
+                                  if false:
+                                    Check if the submitting event is between the 7am to 7pm:
+                                      if true: 
+                                        insert time_charge as regular time_charge ( 1 data row )
+                                      if false:
+                                        prompt user to adjust the time 
+                              if false:
+                                prompt the user to add an hour ahead to the submitting time_charge start_time and end_time, this is serve as our 1-hour lunch break
+                          if false:
+                            Check if the submitting event is between the 7am to 7pm:
+                              if true: 
+                                insert time_charge as regular time_charge ( 1 data row )
+                              if false:
+                                prompt user to adjust the time 
+                  if false:
+                    Check if the submitting event is between the 7am to 7pm:
+                      if true: 
+                        insert time_charge as regular time_charge ( 1 data row )
+                      if false:
+                        prompt user to adjust the time 
+              if false: (this is an overtime time charge)
+                Check if the submitting_event is a next day ot: 
+                  if false:
+                    Check if there are overtime time_charges in the day > 0: 
+                      if false: 
+                        Check if the hour/s of submitting_event is >= 1 hour/s:
+                          if true:
+                            Check if the total events; time_charges, absent, leaves, official business hours in the day > 0:
+                              if true:
+                                Check the submitting overtime time_charge start_time and end_time if it will overlap to any of the time_charges, absent, leaves, official business start_time and end_time of the day:
+                                  if true: 
+                                    prompt the user to fix the submitting time_charge start_time and end_time
+                                  if false:
+                                    Check if the end_time is >= 11:59pm:
+                                      if true:
+                                        insert time_charge as overtime time_charge ( 1 data row )
+                                      if false:
+                                        prompt user that the end_time is not allowed
+                              if false:
+                                Check if the submitting overtime time_charge is between the 7am to 4pm:
+                                  if false: 
+                                    Check if the end_time is >= 11:59pm:
+                                      if true:
+                                        insert time_charge as overtime time_charge ( 1 data row )
+                                      if false:
+                                        prompt user that the end_time is not allowed
+                                  if true:
+                                    prompt user to adjust the time of the submitting overtime time_charge
+                          if false:
+                            return (can't file ot below 1 hour)
+                      if true:
+                        Check if the total events; time_charges, absent, leaves, official business hours in the day > 0:
+                          if true:
+                            Check the submitting overtime time_charge start_time and end_time if it will overlap to any of the time_charges, absent, leaves, official business start_time and end_time of the day:
+                              if true:
+                                prompt the user to fix the submitting time_charge start_time and end_time
+                              if false:
+                                Check if the end_time is >= 11:59pm:
+                                  if true:
+                                    insert time_charge as overtime time_charge
+                                  if false:
+                                    prompt user that the end_time is not allowed
+                          if false:
+                            Check if the submitting overtime time_charge is between the 7am to 4pm:
+                              if false: 
+                                Check if the end_time is >= 11:59pm:
+                                  if true:
+                                    insert time_charge as overtime time_charge  ( 1 data row )
+                                  if false:
+                                    prompt user that the end_time is not allowed
+                              if true:
+                                prompt user to adjust the time of the submitting overtime time_charge
+                  if true:
+                    Check if there are overtime time_charges in the day > 0: 
+                      if false: 
+                        Check if the total events; time_charges, absent, leaves, official business hours in the day > 0:
+                          if true:
+                            Check the submitting overtime time_charge start_time and end_time if it will overlap to any of the time_charges, absent, leaves, official business start_time and end_time of the day:
+                              if true: 
+                                prompt the user to fix the submitting time_charge start_time and end_time
+                              if false:
+                                Check if the end_time is <= 11:59pm:
+                                  if true:
+                                    insert time_charge as overtime time_charge ( 2 data row, 1 per day)
+                                  if false:
+                                    prompt user that the end_time is not allowed
+                          if false:
+                            Check the submitting overtime time_charge start_time and end_time if it will overlap to any of the time_charges, absent, leaves, official business start_time and end_time of the day:
+                              if true: 
+                                prompt the user to fix the submitting time_charge start_time and end_time
+                              if false:
+                                Check if the end_time is <= 11:59pm:
+                                  if true:
+                                    insert time_charge as overtime time_charge ( 2 data row, 1 per day)
+                                  if false:
+                                    prompt user that the end_time is not allowed
+                      if true:
+                        Check if the total events; time_charges, absent, leaves, official business hours in the day > 0:
+                          if true:
+                            Check the submitting overtime time_charge start_time and end_time if it will overlap to any of the time_charges, absent, leaves, official business start_time and end_time of the day:
+                              if true:
+                                prompt the user to fix the submitting time_charge start_time and end_time
+                              if false:
+                                Check if the end_time is <= 11:59pm:
+                                  if true:
+                                    insert time_charge as overtime time_charge ( 2 data row, 1 per day)
+                                  if false:
+                                    prompt user that the end_time is not allowed
+                          if false:
+                            Check if the submitting overtime time_charge is between the 7am to 4pm:
+                              if false: 
+                                Check if the end_time is <= 11:59pm:
+                                  if true:
+                                    insert time_charge as overtime time_charge  ( 2 data row, 1 per day)
+                                  if false:
+                                    prompt user that the end_time is not allowed
+                              if true:
+                                prompt user to adjust the time of the submitting overtime time_charge
+          if false:
+            Check if the total events; time_charges, absent, leaves, official business hours in the day > 0:
+              if true:
+                Check the submitting_event start_time and end_time if it will overlap to any of the time_charges, absent, leaves, official business start_time and end_time of the day:
+                  if true:
+                    prompt the user to fix the submitting_event start_time and end_time
+                  if false:
+                    insert submitting_event
+              if false:
+                insert submitting_event
+      if true:
+        this is an overtime for a time_charge, do the overtime time_charge function
+  if false:
+    this is an overtime for a time_charge, do the overtime time_charge function
+        
+
+        add conditions here:
+
+for the regular time_charge, if an single submitting time_charge is straight up 9 hours, prompt user to manually adjust the time to add 1 hour break or system automatically add a 1 hour break in 11:30am to 12:30pm and split the time charge into two.
+
+if the single submitting time_charge is straight up 10 hours total, ask if the 1 hour is an ot. If yes, add a break in 11:30am to 12:30 and split it into two regular time charges and add another for the ot time charge.
+
+if there are multiple events on the day the time charge is filed, make sure that it is not continuously an 8 hours total, there should be an inteval of 1 hour in between.
+
+If a single regular time_charge starts after 10:00am, the end time should be always at 7:00pm, unless the other is a minimum 1hour, prompt to user that if he wants to automatically add the 1 hour as ot. Also don't forget to add the break at 11:30 to 12:30.
+
+
+
+If submitting_event is on a weekday:
+  If it's not a holiday:
+    If it's a time_charge:
+      If it's a regular time_charge:
+        # New conditions for single time_charge durations
+        If submitting time_charge duration is exactly 9 hours:
+          Prompt user to manually adjust time to add 1 hour break
+          Or
+          System automatically adds 1 hour break from 11:30am to 12:30pm and splits into two time_charges
+        If submitting time_charge duration is exactly 10 hours:
+          Ask user if the extra 1 hour is overtime (OT)
+          If yes:
+            Add 1 hour break from 11:30am to 12:30pm, split into two regular time_charges, and add another for the OT time_charge
+        # New condition for multiple events
+        If there are multiple events (time_charges, absences, leaves, OBs) on the same day:
+          Ensure total regular time_charges are not a continuous block of 8 hours; there must be a 1 hour interval (break) in between
+        If there are existing events (time_charges, absences, leaves, OBs) on the same day:
+          If it overlaps with existing events on the same day:
+            Prompt user to fix time
+          Else:
+            If total hours for the day including this is ≥ 8:
+              If all events are a continuous block of 8 hours:
+                Prompt user to add 1 hour break
+              Else:
+                If gaps exist between events:
+                  If total > 8:
+                    Prompt user to adjust time manually or auto-adjust
+                    If auto-adjust:
+                      Adjust end_time to keep total = 8
+                  If event is within 7 AM–7 PM:
+                    Insert as regular time_charge
+                  Else:
+                    Prompt user to adjust to office hours
+                Else:
+                  Prompt to add 1-hour lunch gap
+              Else:
+                If event is within 7 AM–7 PM:
+                  Insert as regular time_charge
+                Else:
+                  Prompt to adjust
+            Else:
+              If within 7 AM–7 PM:
+                Insert as regular time_charge
+              Else:
+                Prompt to adjust
+        # New condition for late start
+        If a single regular time_charge starts after 10:00am:
+          End time should always be 7:00pm
+          Unless the remaining time is at least 1 hour:
+            Prompt user if they want to automatically add the 1 hour as OT
+          Always add break at 11:30am to 12:30pm
+      Else (Overtime):
+        Handle overtime flow:
+          - If duration < 1 hour → reject
+          - If overlaps with events → prompt to fix
+          - If valid and ends ≥ 11:59 PM:
+              - If next-day OT → split into 2 entries
+              - Else → insert as OT
+          - If ends < 11:59 PM → prompt it's not allowed
+          - If time is within 7 AM–4 PM → prompt to adjust
+    Else (Not a time_charge):
+      If overlaps with events → prompt to fix
+      Else → insert
+  Else (Holiday):
+    Treat as overtime → run OT logic
+Else (Weekend):
+  Treat as overtime → run OT logic
