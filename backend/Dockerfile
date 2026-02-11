@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y \
     libxml2-dev \
     unzip \
     curl \
+    dos2unix \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install \
     pdo_mysql \
@@ -57,7 +58,7 @@ WORKDIR /var/www/html
 
 # Copy and set up entrypoint script
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN dos2unix /usr/local/bin/docker-entrypoint.sh && chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 80
 
