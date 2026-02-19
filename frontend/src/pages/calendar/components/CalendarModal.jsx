@@ -649,6 +649,14 @@ const CalendarModal = ({
       setFormInternal({ project_id: null, project_label: "", status: "" });
       setFormDepartmental({ departmental_task_id: null, activity: "", status: "" });
     }
+
+    // Reset dirty state when loading a new event
+    isInitialMount.current = true;
+    setIsSaved(true);
+    setIsDirty(false);
+    formChangeCounter.current = 0;
+    savedAtCounter.current = 0;
+    setInputErrors({});
   };
 
   // Handler for next/previous navigation (fix: always set state from event, not merging with previous)
@@ -661,6 +669,23 @@ const CalendarModal = ({
     if (newIdx === idx || newIdx < 0 || newIdx >= navEvents.length) return;
     const ev = navEvents[newIdx];
     loadEventIntoForm(ev);
+  };
+
+  // Handler for cancelling changes
+  const handleCancel = () => {
+    if (modalStatus === "edit" && timeFields.id) {
+      const originalEvent = events.find(ev => String(ev.id) === String(timeFields.id) || String(ev.originalId) === String(timeFields.id));
+      if (originalEvent) {
+        isInitialMount.current = true; // Prevent dirty check on next render
+        loadEventIntoForm(originalEvent);
+        // Manually reset dirty state
+        setIsSaved(true);
+        setIsDirty(false);
+        formChangeCounter.current = 0;
+        savedAtCounter.current = 0;
+        setInputErrors({});
+      }
+    }
   };
 
   // Minimal tab navigation for Time Charge / Leave, flexed to start, arrows at end
@@ -1239,44 +1264,56 @@ const CalendarModal = ({
               )}
               <div className="flex-1"></div>
               {!disableAll && (
-                <div className="relative inline-flex group" style={{ padding: 20, margin: -20 }}>
-                  <SaveSparkleEffect
-                    active={isSaved && !isDirty}
-                    sparkColor="#000"
-                    sparkSize={4}
-                    sparkRadius={12}
-                    sparkCount={30}
-                    offset={20}
-                  />
-                  <Button
-                    onClick={async (e) => {
-                      // Only mark as saved if no validation errors
-                      if (Object.keys(inputErrors).length > 0) {
-                        handleSubmit(e);
-                        return;
-                      }
-                      await handleSubmit(e);
-                      savedAtCounter.current = formChangeCounter.current;
-                      setIsSaved(true);
-                      setIsDirty(false);
-                    }}
-                    disabled={loading || (isSaved && !isDirty)}
-                    size="sm"
-                    className={cn(
-                      "px-6 h-8 rounded-full text-xs font-medium shadow-sm transition-all duration-300 relative z-10",
-                      isSaved && !isDirty
-                        ? "bg-zinc-500 text-white cursor-default"
-                        : "bg-primary hover:bg-primary/90 text-white"
-                    )}
-                  >
-                    {loading ? (
-                      <ReactLoading type="spin" color="#ffffff" height={14} width={14} />
-                    ) : isSaved && !isDirty ? (
-                      "Saved"
-                    ) : (
-                      "Save Changes"
-                    )}
-                  </Button>
+                <div className="flex items-center gap-2">
+                  {modalStatus === "edit" && (!isSaved || isDirty) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-gray-400 hover:text-gray-700 h-8 text-xs hover:bg-gray-100 px-3 whitespace-nowrap"
+                      onClick={handleCancel}
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                  <div className="relative inline-flex group" style={{ padding: 20, margin: -20 }}>
+                    <SaveSparkleEffect
+                      active={isSaved && !isDirty}
+                      sparkColor="#000"
+                      sparkSize={4}
+                      sparkRadius={12}
+                      sparkCount={30}
+                      offset={20}
+                    />
+                    <Button
+                      onClick={async (e) => {
+                        // Only mark as saved if no validation errors
+                        if (Object.keys(inputErrors).length > 0) {
+                          handleSubmit(e);
+                          return;
+                        }
+                        await handleSubmit(e);
+                        savedAtCounter.current = formChangeCounter.current;
+                        setIsSaved(true);
+                        setIsDirty(false);
+                      }}
+                      disabled={loading || (isSaved && !isDirty)}
+                      size="sm"
+                      className={cn(
+                        "px-6 h-8 rounded-full text-xs font-medium shadow-sm transition-all duration-300 relative z-10",
+                        isSaved && !isDirty
+                          ? "bg-zinc-500 text-white cursor-default"
+                          : "bg-primary hover:bg-primary/90 text-white"
+                      )}
+                    >
+                      {loading ? (
+                        <ReactLoading type="spin" color="#ffffff" height={14} width={14} />
+                      ) : isSaved && !isDirty ? (
+                        "Saved"
+                      ) : (
+                        "Save Changes"
+                      )}
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
