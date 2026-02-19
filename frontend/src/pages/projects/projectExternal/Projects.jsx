@@ -35,6 +35,7 @@ const Projects = () => {
     setProjects,
     staffs,
     departments,
+    projectStages, // Make sure this is available in context
     isLoading,
     headerReq,
     auth_user
@@ -52,7 +53,6 @@ const Projects = () => {
   }, []);
 
   // --- Handlers ---
-
   const handleAdd = () => {
     setEditingProject(null);
     setFormState(initialFormState);
@@ -85,27 +85,7 @@ const Projects = () => {
 
     try {
       if (editingProject) {
-        // Update
-        const apiPayload = {
-          ...formState,
-          id: editingProject.id,
-          owner_id: Number(formState.owner_id)
-        };
-
-        // Note: The original API for update used field/value pairs, but let's assume standard update object for now based on Internal Projects pattern
-        // If strictly following old pattern, we'd need loop. But let's try standard object first or fall back to loop if needed.
-        // Actually, looking at old code: api("project_update", ... apiPayload) where payload key was 'field' and 'value'.
-        // The old code did ONE field update at a time.
-        // Refactoring to multiple updates or a single update endpoint if available? 
-        // Internal Projects uses `project_internal_update` with full object.
-        // External Projects uses `project_update` with `field`, `value`.
-        // We might need to call update multiple times or backend supports it?
-        // Let's assume for now we must use the old pattern if backend is strict.
-
-        // To be safe and "Zero Breakage", we should loop through changes or assume backend handles it.
-        // However, typical "project_update" might only support one field.
-        // Let's try to send requests for changed fields.
-
+        // Update logic...
         const updates = [];
         if (formState.project_code !== editingProject.project_code) updates.push({ field: 'project_code', value: formState.project_code });
         if (formState.project_name !== editingProject.project_name) updates.push({ field: 'project_name', value: formState.project_name });
@@ -119,9 +99,8 @@ const Projects = () => {
 
         setProjects(prev => prev.map(p => p.id === editingProject.id ? { ...p, ...formState, owner_id: Number(formState.owner_id) } : p));
         successNotification({ title: "Updated", message: "Project updated successfully." });
-
       } else {
-        // Create
+        // Create logic...
         const owner = staffs.find(s => s.id === Number(formState.owner_id));
         const ownerName = owner ? (owner.name || owner.username) : "";
         const newProjectPayload = { ...formState, owner_id: Number(formState.owner_id), owner_name: ownerName };
@@ -136,12 +115,10 @@ const Projects = () => {
     }
   };
 
-  const handleDeleteProject = async (projectId, projectCode) => {
+  const handleDeleteProject = async (projectId) => {
     try {
-      // Old code uses specific payload structure
       const apiPayload = { id: projectId, field: "", value: "" };
       await api('project_delete', { ...headerReq, id: projectId }, apiPayload);
-
       setProjects(prev => prev.filter(p => p.id !== projectId));
       successNotification({ title: "Deleted", message: "Project deleted successfully." });
     } catch (error) {
@@ -154,8 +131,46 @@ const Projects = () => {
     setFormState((prev) => ({ ...prev, [name]: value }));
   };
 
-  // --- DataTable Configuration ---
+  // --- Sub-Component for Stages ---
+  const renderSubComponent = ({ row }) => {
+    const project = row.original;
+    // Filter stages for this project
+    // Assuming projectStages has project_id matching project.id
+    // If not, we need to inspect the data structure. Assuming standard relational ID.
+    const stages = projectStages?.filter(s => s.project_id === project.id) || [];
 
+    if (stages.length === 0) {
+      return <div className="p-4 text-sm text-muted-foreground">No stages defined for this project.</div>;
+    }
+
+    return (
+      <div className="p-4 bg-muted/40 animate-in fade-in slide-in-from-top-2">
+        <h4 className="mb-2 text-sm font-semibold tracking-tight">Project Stages for: {project.project_name}</h4>
+        <div className="rounded-md border bg-background">
+          <table className="w-full caption-bottom text-sm">
+            <thead className="[&_tr]:border-b">
+              <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Stage Name</th>
+                <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Stage Start</th>
+                <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Stage Close</th>
+              </tr>
+            </thead>
+            <tbody className="[&_tr:last-child]:border-0">
+              {stages.map((stage) => (
+                <tr key={stage.id} className="border-b transition-colors hover:bg-muted/50">
+                  <td className="p-4 align-middle">{stage.stage_name}</td>
+                  <td className="p-4 align-middle">{stage.start_date || "-"}</td>
+                  <td className="p-4 align-middle">{stage.end_date || "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  // --- DataTable Configuration ---
   const filteredProjects = useMemo(() => {
     if (!search) return projects;
     const lower = search.toLowerCase();
@@ -168,46 +183,71 @@ const Projects = () => {
 
   const columns = useMemo(() => [
     {
-      accessorKey: "project_code",
-      header: ({ column }) => (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-          Code <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
+      id: "expander",
+      header: () => null,
+      cell: ({ row }) => {
+        return row.getCanExpand() ? (
+          <button
+            className="p-1 rounded-md hover:bg-muted"
+            onClick={() => row.toggleExpanded()}
+            style={{ cursor: "pointer" }}
+          >
+            {row.getIsExpanded() ? (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+            )}
+          </button>
+        ) : null;
+      },
     },
     {
-      accessorKey: "project_name",
+      accessorKey: "project_name", // Swapped layout: Name first
       header: ({ column }) => (
         <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
           Project Name <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
+      cell: ({ row }) => <span className="font-medium">{row.getValue("project_name")}</span>
+    },
+    {
+      accessorKey: "project_code",
+      header: ({ column }) => (
+        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+          Project Code <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+    },
+    {
+      accessorKey: "owner_id",
+      header: "Project Owner",
+      cell: ({ row }) => {
+        const owner = staffs.find(s => s.id === row.original.owner_id);
+        const ownerName = owner ? (owner.name || owner.username) : "No project owner";
+        return (
+          <div className="flex items-center space-x-2">
+            <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">
+              {ownerName.charAt(0)}
+            </div>
+            <span>{ownerName}</span>
+          </div>
+        );
+      }
     },
     {
       accessorKey: "studio",
       header: "Studio",
-    },
-    {
-      accessorKey: "owner_id", // We display name, but sort/filter key is owner_id technically, or we can use accessorFn
-      header: "Owner",
-      cell: ({ row }) => {
-        const owner = staffs.find(s => s.id === row.original.owner_id);
-        return owner ? (owner.name || owner.username) : <span className="text-muted-foreground">N/A</span>;
-      }
+      cell: ({ row }) => row.getValue("studio") || "N/A"
     },
     {
       accessorKey: "project_status",
       header: "Status",
       cell: ({ row }) => {
         const status = row.getValue("project_status");
-        let colorClass = "bg-gray-100 text-gray-800";
-        if (status === 'active') colorClass = "bg-green-100 text-green-800";
-        if (status === 'inactive') colorClass = "bg-red-100 text-red-800";
-        if (status === 'completed') colorClass = "bg-blue-100 text-blue-800";
-
+        // Simplified status text as per design
         return (
-          <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${colorClass}`}>
-            {status}
+          <span className="text-sm">
+            {status || "Unknown"}
           </span>
         )
       }
@@ -215,12 +255,8 @@ const Projects = () => {
     {
       id: "actions",
       cell: ({ row }) => {
+        // ... existing actions ...
         const project = row.original;
-        // Assuming only admins/managers can edit? Original code checked role_id for owner selection but not explicitly for edit actions in table?
-        // Internal projects allowed role_id === 3. Let's assume Admin (3) for now or match original.
-        // Original `Projects.jsx` allowed edit if valid token? It didn't seem to restrict generic edit, but let's stick to safe side.
-        // Showing actions for everyone for now, maybe restrict later if needed.
-
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -268,11 +304,12 @@ const Projects = () => {
           project={projectToDelete}
         />
 
-        {/* Header */}
+
+        {/* Header & Actions */}
         <div className="flex items-center justify-between space-y-2">
           <div>
             <h2 className="text-3xl font-bold tracking-tight">External Projects</h2>
-            <p className="text-muted-foreground">Manage external projects and studios.</p>
+            <p className="text-muted-foreground">Manage external projects, codes, and stage tracking.</p>
           </div>
           <div className="flex items-center space-x-2">
             <Button onClick={handleAdd}>
@@ -281,9 +318,11 @@ const Projects = () => {
           </div>
         </div>
 
+
         {/* Filters & Table */}
         <div className="space-y-4">
           <div className="flex items-center max-w-sm">
+            {/* Keeping search here */}
             <Input
               placeholder="Search projects..."
               value={search}
@@ -300,12 +339,14 @@ const Projects = () => {
             <DataTable
               columns={columns}
               data={filteredProjects}
+              getRowCanExpand={() => true} // All rows expandable
+              renderSubComponent={renderSubComponent}
             />
           )}
         </div>
       </div>
     </PageContainer>
   );
+  // End Projects Component
 };
-
 export default Projects;

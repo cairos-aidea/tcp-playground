@@ -7,9 +7,10 @@ import {
     getFilteredRowModel,
     getPaginationRowModel,
     getSortedRowModel,
+    getExpandedRowModel,
     useReactTable,
 } from "@tanstack/react-table"
-import { ChevronDown, SlidersHorizontal } from "lucide-react"
+import { ChevronDown, SlidersHorizontal, ChevronRight } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -33,11 +34,14 @@ export function DataTable({
     data,
     searchKey,
     onSearch,
+    renderSubComponent, // New prop for rendering expanded content
+    getRowCanExpand, // Optional prop to determine if row can expand
 }) {
     const [sorting, setSorting] = React.useState([])
     const [columnFilters, setColumnFilters] = React.useState([])
     const [columnVisibility, setColumnVisibility] = React.useState({})
     const [rowSelection, setRowSelection] = React.useState({})
+    const [expanded, setExpanded] = React.useState({}) // State for expansion
 
     const table = useReactTable({
         data,
@@ -48,18 +52,23 @@ export function DataTable({
         getPaginationRowModel: getPaginationRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
+        getExpandedRowModel: getExpandedRowModel(), // Enable expansion
         onColumnVisibilityChange: setColumnVisibility,
         onRowSelectionChange: setRowSelection,
+        onExpandedChange: setExpanded, // Handle expansion change
+        getRowCanExpand: getRowCanExpand, // Pass through
         state: {
             sorting,
             columnFilters,
             columnVisibility,
             rowSelection,
+            expanded,
         },
     })
 
     return (
         <div className="w-full space-y-4">
+            {/* ... Header controls ... */}
             <div className="flex items-center justify-between">
                 <div className="flex flex-1 items-center space-x-2">
                     {searchKey && (
@@ -103,6 +112,7 @@ export function DataTable({
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
+
             <div className="rounded-md border">
                 <Table>
                     <TableHeader>
@@ -126,19 +136,28 @@ export function DataTable({
                     <TableBody>
                         {table.getRowModel().rows?.length ? (
                             table.getRowModel().rows.map((row) => (
-                                <TableRow
-                                    key={row.id}
-                                    data-state={row.getIsSelected() && "selected"}
-                                >
-                                    {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id}>
-                                            {flexRender(
-                                                cell.column.columnDef.cell,
-                                                cell.getContext()
-                                            )}
-                                        </TableCell>
-                                    ))}
-                                </TableRow>
+                                <React.Fragment key={row.id}>
+                                    <TableRow
+                                        data-state={row.getIsSelected() && "selected"}
+                                        className={row.getIsExpanded() ? "border-b-0 bg-muted/50" : ""}
+                                    >
+                                        {row.getVisibleCells().map((cell) => (
+                                            <TableCell key={cell.id}>
+                                                {flexRender(
+                                                    cell.column.columnDef.cell,
+                                                    cell.getContext()
+                                                )}
+                                            </TableCell>
+                                        ))}
+                                    </TableRow>
+                                    {row.getIsExpanded() && renderSubComponent && (
+                                        <TableRow>
+                                            <TableCell colSpan={row.getVisibleCells().length} className="p-0 bg-muted/30">
+                                                {renderSubComponent({ row })}
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </React.Fragment>
                             ))
                         ) : (
                             <TableRow>
@@ -153,6 +172,9 @@ export function DataTable({
                     </TableBody>
                 </Table>
             </div>
+            {/* ... Footer ... */}
+// End of component
+};
             <div className="flex items-center justify-end space-x-2 py-4">
                 <div className="flex-1 text-sm text-muted-foreground">
                     {table.getFilteredSelectedRowModel().rows.length} of{" "}
@@ -177,6 +199,6 @@ export function DataTable({
                     </Button>
                 </div>
             </div>
-        </div>
+        </div >
     )
 }
