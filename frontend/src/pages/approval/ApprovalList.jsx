@@ -4,7 +4,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Check, X, Filter, RefreshCw } from 'lucide-react';
 import { useAppData } from '../../context/AppDataContext';
-import { api } from '../../api/api';
+import { useApprovals, useApprovalActions } from '../../hooks/useApprovals';
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -31,10 +31,6 @@ const formatDate = (dateString) => {
 
 const ApprovalList = () => {
   const {
-    timeCharges, // { data: [], current_page, etc }
-    fetchApproversList,
-    headerReq,
-    isLoading,
     // Filter data dependencies...
     projects, projectStages, staffs, departments, auth_user
   } = useAppData();
@@ -48,21 +44,24 @@ const ApprovalList = () => {
   });
   const [search, setSearch] = useState("");
 
-  // Load Data
-  useEffect(() => {
-    fetchApproversList(page, filter, itemsPerPage);
-  }, [page, filter]);
+  // React Query Hooks
+  const { data: timeCharges, isLoading, isFetching } = useApprovals(page, filter, itemsPerPage);
+  const { mutate: performAction } = useApprovalActions();
 
   // Handle Actions
-  const handleAction = async (action, ids) => {
+  const handleAction = (action, ids) => {
     if (!ids.length) return;
-    try {
-      await api(action, headerReq, { time_charge_ids: ids });
-      fetchApproversList(page, filter, itemsPerPage);
-      setSelectedIds([]);
-    } catch (e) {
-      console.error(e);
-    }
+    performAction(
+      { action, ids },
+      {
+        onSuccess: () => {
+          setSelectedIds([]);
+        },
+        onError: (error) => {
+          console.error("Action failed:", error);
+        }
+      }
+    );
   };
 
   const filteredTimeCharges = useMemo(() => {
