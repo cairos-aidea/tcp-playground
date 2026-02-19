@@ -6,6 +6,7 @@ import { Check, X, Filter, RefreshCw } from 'lucide-react';
 import { useAppData } from '../../context/AppDataContext';
 import { api } from '../../api/api';
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   Sheet,
   SheetContent,
@@ -45,6 +46,7 @@ const ApprovalList = () => {
     is_ot: false, start_date: null, end_date: null,
     project_id: null, stage_id: null, staff_id: null, status: null
   });
+  const [search, setSearch] = useState("");
 
   // Load Data
   useEffect(() => {
@@ -62,6 +64,25 @@ const ApprovalList = () => {
       console.error(e);
     }
   };
+
+  const filteredTimeCharges = useMemo(() => {
+    const data = timeCharges?.data || [];
+    if (!search) return data;
+    const lower = search.toLowerCase();
+    return data.filter(item => {
+      const projectCode = item.project_code?.toLowerCase() || "";
+      const projectLabel = item.project_label?.toLowerCase() || "";
+      const userName = (item.user?.first_name + " " + item.user?.last_name)?.toLowerCase() || "";
+      const stageLabel = item.stage_label?.toLowerCase() || "";
+
+      return (
+        projectCode.includes(lower) ||
+        projectLabel.includes(lower) ||
+        userName.includes(lower) ||
+        stageLabel.includes(lower)
+      );
+    });
+  }, [timeCharges?.data, search]);
 
   const columns = useMemo(() => [
     {
@@ -238,12 +259,23 @@ const ApprovalList = () => {
         </div>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={timeCharges?.data || []}
-        loading={isLoading}
-        onRowSelectionChange={(rows) => setSelectedIds(rows.map(r => r.original.id))}
-      />
+      <div className="space-y-4">
+        <div className="flex items-center max-w-sm">
+          <Input
+            placeholder="Search approvals..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-[300px]"
+          />
+        </div>
+
+        <DataTable
+          columns={columns}
+          data={filteredTimeCharges}
+          loading={isLoading}
+          onRowSelectionChange={(rows) => setSelectedIds(rows.map(r => r.original.id))}
+        />
+      </div>
       {/* Pagination Control needed if DataTable doesn't handle server-side paging built-in 
             For now assuming DataTable handles local or we add a footer pagination 
         */}
