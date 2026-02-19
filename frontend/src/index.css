@@ -210,6 +210,34 @@
   border-radius: 8px !important;
 }
 
+/* DnD resize anchors: transparent but fully interactive */
+.rbc-addons-dnd-resize-ns-anchor {
+  cursor: ns-resize !important;
+  opacity: 0 !important;
+  height: 20px !important;
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 60 !important;
+}
+
+/* While dragging/resizing show correct cursor globally */
+.rbc-addons-dnd-is-dragging * {
+  cursor: grabbing !important;
+}
+
+.rbc-addons-dnd-is-resizing * {
+  cursor: ns-resize !important;
+}
+
+.rbc-addons-dnd-resize-ns-anchor:first-child {
+  top: 0 !important;
+}
+
+.rbc-addons-dnd-resize-ns-anchor:last-child {
+  bottom: 0 !important;
+}
+
 .rbc-month-row {
   overflow: visible !important;
   flex: none !important;

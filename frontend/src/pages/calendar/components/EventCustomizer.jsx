@@ -2,7 +2,7 @@ import { CircleCheck, CircleX, Clock, DatabaseBackup, Hourglass, Calendar as Cal
 import moment from "moment";
 import { cn } from "@/lib/utils";
 
-const EventCustomizer = ({ view, event }) => {
+const EventCustomizer = ({ view, event, showDragHandles = false }) => {
   if (event.source === "SYNC-SP-LIST" && (view === "day" || view === "week")) {
     return null;
   }
@@ -15,6 +15,8 @@ const EventCustomizer = ({ view, event }) => {
     icon: "text-yellow-900",
     subtext: "text-yellow-900/80"
   };
+
+  const isEditable = !["approved", "declined"].includes((event.status || "").toLowerCase());
 
   if (event.type === "leave") {
     styles = {
@@ -150,17 +152,32 @@ const EventCustomizer = ({ view, event }) => {
       <div
         className={cn(
           "absolute inset-0 w-full min-h-full p-2 flex flex-col rounded-md border transition-all duration-200 ease-in-out",
-          "hover:h-auto hover:z-50 hover:shadow-xl hover:scale-[1.02]",
+          "hover:shadow-[0_0_14px_4px_rgba(0,0,0,0.18)] hover:z-50",
           styles.bg,
           styles.border
         )}
       >
+        {/* Top resize handle indicator — shown only when drag handles are enabled and event is selected AND editable */}
+        {showDragHandles && event.isCurrent && isEditable && (
+          <div className="absolute top-0 left-0 right-0 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-10">
+            <div className="mt-[3px] flex flex-col gap-[3px]">
+              <div className="w-5 h-[2px] rounded-full bg-current opacity-40" />
+              <div className="w-5 h-[2px] rounded-full bg-current opacity-40" />
+            </div>
+          </div>
+        )}
+
         {/* Header: Icon + Time + (Duration) */}
-        <div className={cn("flex items-center gap-1.5 text-[10px] font-medium mb-1", styles.icon)}>
-          <Icon size={12} className="shrink-0" />
-          <span className="truncate">
-            {startStr} – {endStr} <span className="opacity-75">({durationStr})</span>
-          </span>
+        <div className={cn("flex items-center justify-between text-[10px] font-medium mb-1", styles.icon)}>
+          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            <Icon size={12} className="shrink-0" />
+            <span className="truncate">
+              {startStr} – {endStr} <span className="opacity-75">({durationStr})</span>
+            </span>
+          </div>
+          {showDragHandles && event.isCurrent && (
+            <span className="text-[9px] font-bold uppercase tracking-wider opacity-60 ml-1 shrink-0">Selected</span>
+          )}
         </div>
 
         {/* Title */}
@@ -172,6 +189,16 @@ const EventCustomizer = ({ view, event }) => {
         {subtitle && (
           <div className={cn("text-[10px] mt-0.5 leading-tight line-clamp-2", styles.subtext)}>
             {subtitle}
+          </div>
+        )}
+
+        {/* Bottom resize handle indicator — shown only when drag handles are enabled and event is selected AND editable */}
+        {showDragHandles && event.isCurrent && isEditable && (
+          <div className="absolute bottom-0 left-0 right-0 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-10">
+            <div className="mb-[3px] flex flex-col gap-[3px]">
+              <div className="w-5 h-[2px] rounded-full bg-current opacity-40" />
+              <div className="w-5 h-[2px] rounded-full bg-current opacity-40" />
+            </div>
           </div>
         )}
       </div>

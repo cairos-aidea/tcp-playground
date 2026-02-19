@@ -581,15 +581,8 @@ const CalendarModal = ({
     return -1;
   };
 
-  // Handler for next/previous navigation (fix: always set state from event, not merging with previous)
-  const handleNavigateEvent = (direction) => {
-    const navEvents = getNavigableEvents();
-    const idx = getCurrentEventIndex();
-    let newIdx = idx;
-    if (direction === "prev") newIdx = idx > 0 ? idx - 1 : idx;
-    if (direction === "next") newIdx = idx < navEvents.length - 1 ? idx + 1 : idx;
-    if (newIdx === idx || newIdx < 0 || newIdx >= navEvents.length) return;
-    const ev = navEvents[newIdx];
+  // Cleanly extract the logic to load an event into the form
+  const loadEventIntoForm = (ev) => {
     setModalType(ev.type === "timeCharge" ? "timeCharge" : "leave");
     if (ev.type === "timeCharge") {
       // Set all timeFields from event
@@ -656,6 +649,18 @@ const CalendarModal = ({
       setFormInternal({ project_id: null, project_label: "", status: "" });
       setFormDepartmental({ departmental_task_id: null, activity: "", status: "" });
     }
+  };
+
+  // Handler for next/previous navigation (fix: always set state from event, not merging with previous)
+  const handleNavigateEvent = (direction) => {
+    const navEvents = getNavigableEvents();
+    const idx = getCurrentEventIndex();
+    let newIdx = idx;
+    if (direction === "prev") newIdx = idx > 0 ? idx - 1 : idx;
+    if (direction === "next") newIdx = idx < navEvents.length - 1 ? idx + 1 : idx;
+    if (newIdx === idx || newIdx < 0 || newIdx >= navEvents.length) return;
+    const ev = navEvents[newIdx];
+    loadEventIntoForm(ev);
   };
 
   // Minimal tab navigation for Time Charge / Leave, flexed to start, arrows at end
@@ -1787,7 +1792,16 @@ const CalendarModal = ({
           style={{ height: 500 }}
           selectable={!disableDragResize}
           onSelectSlot={handleSelectSlot}
-          // onSelectEvent={(event) => console.log("cklicked")}
+          onSelectEvent={(event) => {
+            // If dragging/resizing is disabled (e.g. status is approved/declined), we still might want to allow selection?
+            // Actually, if it's the current one being edited, do nothing.
+            if (event.isCurrent || event.id === "current" || String(event.id) === String(timeFields.id)) return;
+            // Find original event
+            const original = (events || []).find(ev => String(ev.id) === String(event.id));
+            if (original) {
+              loadEventIntoForm(original);
+            }
+          }}
           resizable={!disableDragResize}
           onEventResize={handleEventResize}
           onEventDrop={handleEventDrop}
@@ -1799,7 +1813,7 @@ const CalendarModal = ({
             !disableDragResize && event.isCurrent
           }
           components={{
-            event: (props) => <EventCustomizer {...props} setInputErrors={setInputErrors} />,
+            event: (props) => <EventCustomizer {...props} showDragHandles={true} setInputErrors={setInputErrors} />,
             timeHeader: () => null
           }}
           slotPropGetter={(date) => {
