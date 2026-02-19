@@ -1,19 +1,16 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useAppData } from "../../../context/AppDataContext";
-import PageContainer from "@/components/ui/PageContainer";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PageContainer } from "@/components/ui/PageContainer";
 import { Button } from "@/components/ui/button";
-import { Search, History, FolderOpen } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { DataTable } from "@/components/ui/data-table";
+import { FolderOpen, ArrowUpDown } from "lucide-react";
 
 const RECENT_PROJECTS_KEY = "recentOpenedProjects";
 
 const ETFSelection = ({ onSelectProject }) => {
-  const {
-    projects,
-  } = useAppData();
+  const { projects } = useAppData();
   const [search, setSearch] = useState("");
   const [recentProjects, setRecentProjects] = useState([]);
 
@@ -43,161 +40,116 @@ const ETFSelection = ({ onSelectProject }) => {
     });
   };
 
-  // Filter projects
-  const filteredProjects = (projects || [])
-    .filter(
-      project =>
+  // Prepare data for DataTable
+  const data = useMemo(() => {
+    if (!projects) return [];
+
+    // Filter projects
+    const filtered = projects.filter(
+      (project) =>
         project.project_status !== "Lost Proposal" &&
         project.project_status !== "Aborted Proposal" &&
-        (project.project_name.toLowerCase().includes(search.toLowerCase()) ||
-          project.project_code.toLowerCase().includes(search.toLowerCase()))
+        (project.project_name?.toLowerCase().includes(search.toLowerCase()) ||
+          project.project_code?.toLowerCase().includes(search.toLowerCase()))
     );
 
-  // Get recent opened projects that are in filteredProjects
-  const recentOpenedProjects = recentProjects
-    .map(rp => filteredProjects.find(p => p.id === rp.id))
-    .filter(Boolean);
+    // Map to display format and include lastOpened timestamp for sorting
+    return filtered.map(project => {
+      const rp = recentProjects.find(r => r.id === project.id);
+      return {
+        ...project,
+        lastOpened: rp ? rp.openedAt : 0, // 0 for never opened
+      };
+    }).sort((a, b) => b.lastOpened - a.lastOpened); // Sort by last opened desc
+  }, [projects, search, recentProjects]);
 
-  // Get the rest of the filtered projects (not in recent)
-  const otherProjects = filteredProjects.filter(
-    p => !recentOpenedProjects.some(rp => rp.id === p.id)
-  );
+
+  const columns = useMemo(() => [
+    {
+      accessorKey: "project_name",
+      header: ({ column }) => (
+        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+          Project Name <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => <span className="font-medium">{row.getValue("project_name")}</span>
+    },
+    {
+      accessorKey: "project_code",
+      header: "Code",
+    },
+    {
+      accessorKey: "project_status",
+      header: "Status",
+      cell: ({ row }) => <Badge variant="outline" className="font-normal text-xs">{row.getValue("project_status")}</Badge>
+    },
+    {
+      accessorKey: "lastOpened",
+      header: "Last Opened",
+      cell: ({ row }) => {
+        const ts = row.getValue("lastOpened");
+        if (!ts) return "-";
+        const date = new Date(ts);
+        return <span className="text-xs text-muted-foreground">{date.toLocaleDateString()} {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>;
+      }
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-8 w-8 p-0"
+          onClick={() => handleProjectClick(row.original)}
+        >
+          <FolderOpen className="h-4 w-4 text-primary" />
+        </Button>
+      )
+    }
+  ], [recentProjects]); // Re-create columns if recentProjects changes (affects handleProjectClick closure? No, function is stable-ish but dependencies good practice)
 
   return (
     <PageContainer>
-      <div className="flex flex-col items-center justify-start min-h-[calc(100vh-100px)] py-10">
-        <div className="w-full max-w-5xl space-y-6">
-          <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">ETF Management</h1>
+      <div className="flex-1 space-y-6">
+
+        {/* Header & Actions */}
+        <div className="flex items-center justify-between space-y-2">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">ETF Management</h2>
             <p className="text-muted-foreground">Select a project to manage Estimated Time of Force (ETF) and Manpower Allocation.</p>
           </div>
-
-          <Card className="border-border shadow-sm">
-            <CardHeader className="pb-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <CardTitle className="text-lg">Projects</CardTitle>
-                  <CardDescription>Search and select a project to proceed.</CardDescription>
-                </div>
-                <div className="relative w-full sm:w-72">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search project name or code..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="pl-8 bg-muted/50"
-                  />
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50 hover:bg-muted/50">
-                    <TableHead className="w-[40%]">Project Name</TableHead>
-                    <TableHead>Code</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Last Opened</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {/* Recent Projects Section */}
-                  {recentOpenedProjects.length > 0 && (
-                    <>
-                      <TableRow className="hover:bg-transparent bg-muted/10">
-                        <TableCell colSpan={5} className="font-semibold text-xs text-muted-foreground uppercase tracking-wider py-2">
-                          <div className="flex items-center gap-2">
-                            <History className="h-3 w-3" /> Recent Projects
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                      {recentOpenedProjects.map((project) => {
-                        const rp = recentProjects.find(rp => rp.id === project.id);
-                        let lastOpened = "";
-                        if (rp && rp.openedAt) {
-                          const date = new Date(rp.openedAt);
-                          lastOpened = date.toLocaleDateString() + " " + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                        }
-                        return (
-                          <TableRow key={project.id} className="group cursor-pointer hover:bg-muted/50" onClick={() => handleProjectClick(project)}>
-                            <TableCell className="font-medium">
-                              <div className="flex flex-col">
-                                <span className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{project.project_name}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="font-mono text-xs">{project.project_code}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="font-normal text-xs">{project.project_status}</Badge>
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">{lastOpened}</TableCell>
-                            <TableCell className="text-right">
-                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                                <FolderOpen className="h-4 w-4 text-primary" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </>
-                  )}
-
-                  {/* All Projects Section */}
-                  {otherProjects.length > 0 && (
-                    <>
-                      <TableRow className="hover:bg-transparent bg-muted/10 border-t">
-                        <TableCell colSpan={5} className="font-semibold text-xs text-muted-foreground uppercase tracking-wider py-2">
-                          All Projects
-                        </TableCell>
-                      </TableRow>
-                      {otherProjects.map((project) => (
-                        <TableRow key={project.id} className="group cursor-pointer hover:bg-muted/50" onClick={() => handleProjectClick(project)}>
-                          <TableCell className="font-medium">
-                            <div className="flex flex-col">
-                              <span className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{project.project_name}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">{project.project_code}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="font-normal text-xs">{project.project_status}</Badge>
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">-</TableCell>
-                          <TableCell className="text-right">
-                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                              <FolderOpen className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </>
-                  )}
-
-                  {filteredProjects.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="h-24 text-center">
-                        No projects found.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          {recentProjects.length > 0 && (
-            <div className="flex justify-center">
+          <div className="flex items-center space-x-2">
+            {recentProjects.length > 0 && (
               <Button
-                variant="link"
-                className="text-xs text-muted-foreground hover:text-destructive"
+                variant="outline"
+                size="sm"
                 onClick={() => {
                   setRecentProjects([]);
                   localStorage.removeItem(RECENT_PROJECTS_KEY);
                 }}
               >
-                Clear Recent History
+                Clear History
               </Button>
-            </div>
-          )}
+            )}
+          </div>
+        </div>
+
+        {/* Filters & Table */}
+        <div className="space-y-4">
+          <div className="flex items-center max-w-sm">
+            <Input
+              placeholder="Search projects..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-[300px]"
+            />
+          </div>
+
+          <DataTable
+            columns={columns}
+            data={data}
+            enablePagination={false} // Keep all content loaded
+          />
         </div>
       </div>
     </PageContainer>
