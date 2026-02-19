@@ -81,10 +81,7 @@ const EventCustomizer = ({ view, event }) => {
   if (event.type === "timeCharge") {
     if (event.chargeType === "external") {
       title = event.project_label || event.project_code || "External Project";
-      const parts = [];
-      if (event.stage_label) parts.push(event.stage_label);
-      if (event.activity) parts.push(event.activity);
-      subtitle = parts.join(" - ");
+      // Keep stage and activity separate for two-row display
     } else if (event.chargeType === "internal") {
       title = event.project_label || "Internal Project";
       subtitle = event.status || "Internal";
@@ -124,12 +121,25 @@ const EventCustomizer = ({ view, event }) => {
           {title}
         </div>
 
-        {/* Subtitle */}
-        {subtitle && (
+        {/* Subtitle: stage and activity on separate rows */}
+        {event.type === "timeCharge" && event.chargeType === "external" ? (
+          <>
+            {event.stage_label && (
+              <div className={cn("mt-0.5 leading-tight opacity-80", styles.subtext)}>
+                {event.stage_label}
+              </div>
+            )}
+            {event.activity && (
+              <div className={cn("leading-tight opacity-80", styles.subtext)}>
+                {event.activity}
+              </div>
+            )}
+          </>
+        ) : (subtitle && (
           <div className={cn("mt-0.5 leading-tight opacity-80", styles.subtext)}>
             {subtitle}
           </div>
-        )}
+        ))}
       </div>
     );
   }

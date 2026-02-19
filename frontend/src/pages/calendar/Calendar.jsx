@@ -972,7 +972,8 @@ const Calendar = () => {
                 views={["month", "week", "day"]}
                 step={15}
                 timeslots={4}
-                style={{ height: "100%" }}
+                style={{ height: '100%' }}
+                showAllEvents={currentView === 'month'}
                 onSelecting={handleSelecting}
                 onSelectSlot={handleSelectSlot}
                 onSelectEvent={(e) => handleSelectEvent(e)}

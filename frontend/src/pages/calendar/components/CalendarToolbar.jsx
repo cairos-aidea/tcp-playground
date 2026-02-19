@@ -186,35 +186,45 @@ const CalendarToolbar = ({ userHireDate, events, date, label, localizer, onNavig
                 <div className="flex items-center gap-2">
                     {/* Missing hours pill */}
                     <div className={cn(
-                        "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-colors",
+                        "flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-full border text-xs font-medium transition-colors",
                         stats.missingHours === 0
                             ? "border-border bg-background text-muted-foreground"
-                            : "border-destructive/30 bg-destructive/5 text-destructive"
+                            : "border-red-300 bg-red-50 text-red-700"
                     )}>
-                        {stats.missingHours === 0
-                            ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                            : <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
-                        <span>
+                        <span className={cn(
+                            "flex items-center justify-center w-5 h-5 rounded-full shrink-0",
+                            stats.missingHours === 0 ? "bg-emerald-100" : "bg-red-100"
+                        )}>
                             {stats.missingHours === 0
-                                ? "No missing hours"
-                                : <><span className="opacity-70">Missing</span>{" "}<span className="font-bold">{fmtH(stats.missingHours)}</span></>}
+                                ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                                : <AlertCircle className="w-3.5 h-3.5 text-red-500" />}
+                        </span>
+                        <span className="flex items-baseline gap-1">
+                            {stats.missingHours === 0
+                                ? <span className="text-muted-foreground">Up to date</span>
+                                : <><span className="text-red-500/80 font-normal">Missing</span><span className="font-bold text-red-700">{fmtH(stats.missingHours)}</span></>}
                         </span>
                     </div>
 
                     {/* Pending hours pill */}
                     <div className={cn(
-                        "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-colors",
+                        "flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-full border text-xs font-medium transition-colors",
                         stats.pendingHours === 0
                             ? "border-border bg-background text-muted-foreground"
-                            : "border-amber-300/60 bg-amber-50/80 text-amber-700"
+                            : "border-amber-300 bg-amber-50 text-amber-700"
                     )}>
-                        {stats.pendingHours === 0
-                            ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                            : <Clock className="w-3.5 h-3.5 shrink-0" />}
-                        <span>
+                        <span className={cn(
+                            "flex items-center justify-center w-5 h-5 rounded-full shrink-0",
+                            stats.pendingHours === 0 ? "bg-emerald-100" : "bg-amber-100"
+                        )}>
                             {stats.pendingHours === 0
-                                ? "No pending"
-                                : <><span className="opacity-70">For Approval</span>{" "}<span className="font-bold">{fmtH(stats.pendingHours)}</span></>}
+                                ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                                : <Clock className="w-3.5 h-3.5 text-amber-500" />}
+                        </span>
+                        <span className="flex items-baseline gap-1">
+                            {stats.pendingHours === 0
+                                ? <span className="text-muted-foreground">No pending</span>
+                                : <><span className="text-amber-600/80 font-normal">For Approval</span><span className="font-bold text-amber-700">{fmtH(stats.pendingHours)}</span></>}
                         </span>
                     </div>
                 </div>

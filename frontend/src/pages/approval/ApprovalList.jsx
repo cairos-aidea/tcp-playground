@@ -45,7 +45,7 @@ const ApprovalList = () => {
   const [search, setSearch] = useState("");
 
   // React Query Hooks
-  const { data: timeCharges, isLoading, isFetching } = useApprovals(page, filter, itemsPerPage);
+  const { data: timeCharges, isLoading, isFetching, refetch } = useApprovals(page, filter, itemsPerPage);
   const { mutate: performAction } = useApprovalActions();
 
   // Handle Actions
@@ -232,6 +232,9 @@ const ApprovalList = () => {
               </Button>
             </div>
           )}
+          <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching} title="Refresh">
+            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+          </Button>
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="outline"><Filter className="mr-2 h-4 w-4" /> Filter</Button>
