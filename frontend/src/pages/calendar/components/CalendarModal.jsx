@@ -587,6 +587,11 @@ const CalendarModal = ({
   // Cleanly extract the logic to load an event into the form
   const loadEventIntoForm = (ev) => {
     setModalType(ev.type === "timeCharge" ? "timeCharge" : "leave");
+    // Update modal status based on event status
+    const status = ev.status || "";
+    const isFinal = ["approved", "declined"].includes(status.toLowerCase());
+    setModalStatus(isFinal ? "view" : "edit");
+
     if (ev.type === "timeCharge") {
       // Set all timeFields from event
       setTimeFields({
