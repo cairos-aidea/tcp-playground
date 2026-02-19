@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useMemo } from "react";
+import { PageContainer } from "@/components/ui/PageContainer";
 import { useAppData } from "../../../context/AppDataContext";
 import { api } from "../../../api/api";
 import { Plus, ArrowUpDown, MoreHorizontal, SquarePen, Trash2 } from "lucide-react";
@@ -227,8 +228,8 @@ const ProjectsInternal = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-background">
-      <div className="flex-1 overflow-y-auto p-8 space-y-6">
+    <PageContainer>
+      <div className="flex-1 space-y-6">
 
         {/* Modals */}
         {modalVisible && (
@@ -290,7 +291,7 @@ const ProjectsInternal = () => {
         </div>
 
       </div>
-    </div>
+    </PageContainer>
   );
 };
 
