@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { components } from "react-select";
 import moment from "moment";
 import Select from "react-select";
@@ -38,6 +39,7 @@ const CalendarModal = ({
   show,
   onClose,
   modalStatus,
+  setModalStatus,
   modalType,
   setModalType,
   timeFields,
@@ -69,6 +71,7 @@ const CalendarModal = ({
   auth_user,
   departments,
 }) => {
+  const queryClient = useQueryClient();
   const {
     staffs,
     activities,
@@ -1250,7 +1253,46 @@ const CalendarModal = ({
                               description: "The entry has been removed from your calendar.",
                               duration: 3000,
                             });
-                            onClose();
+                            // Refresh approvals list
+                            queryClient.invalidateQueries({ queryKey: ['approvals'] });
+
+                            // Reset form to create mode for the same day
+                            setModalStatus("create");
+                            setTimeFields({
+                              id: "",
+                              start_time: moment(calendarDate).format("YYYY-MM-DDTHH:mm"),
+                              end_time: moment(calendarDate).add(1, 'hour').format("YYYY-MM-DDTHH:mm"), // Optional default duration
+                              is_ot: false,
+                              next_day_ot: false,
+                              ot_type: "",
+                              remarks: ""
+                            });
+                            // Reset other forms
+                            setFormExternal({ project_id: null, project_code: "", project_label: "", stage_id: null, stage_label: "", activity: "", status: "" });
+                            setFormInternal({ project_id: null, project_label: "", status: "" });
+                            setFormDepartmental({ departmental_task_id: null, activity: "", status: "" });
+                            setFormLeave({ leave_code: "", start_time: "", end_time: "", status: "" });
+
+                            // Mark as clean state
+                            setIsSaved(false);
+                            setIsDirty(true);
+                            setInputErrors({});
+                            setTimeWarnings([]);
+
+                            // Actually, if we reset to defaults, maybe dirty is true because we set defaults?
+                            // If create mode, typically isDirty starts as true if we have defaults?
+                            // Let's check initial state logic:
+                            // useEffect(() => { setIsSaved(modalStatus === "edit"); setIsDirty(!isEdit); ... }, [show, ...]);
+
+                            // Let's manually trigger the effect logic or rely on state.
+                            // But usually effect runs on modalStatus change. 
+                            // Since we change modalStatus state in parent, the effect in CalendarModal dependent on modalStatus prop might run?
+                            // Yes, dependency [show, timeFields.id, modalStatus].
+                            // We changed modalStatus via prop callback which updates parent state -> re-render with new prop -> effect runs.
+
+                            // So we just need to update parent state via callback.
+                            // However, we also need to update local form state (timeFields etc are props from parent).
+
                           } catch (err) {
                             toast.error("Failed to delete time charge");
                           } finally { setLoading(false); }
@@ -1821,6 +1863,7 @@ const CalendarModal = ({
           // view={Views.DAY}
           defaultView={Views.DAY}
           date={date}
+          scrollToTime={timeFields.start_time ? new Date(timeFields.start_time) : new Date(new Date().setHours(8, 0, 0, 0))}
           toolbar={false}
           min={moment(date).startOf("day").toDate()}
           max={moment(date).endOf("day").toDate()}

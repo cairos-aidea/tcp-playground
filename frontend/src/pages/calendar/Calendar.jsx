@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useQueryClient } from "@tanstack/react-query";
 import moment from 'moment';
 import "moment-timezone";
 import { Calendar as BaseCalendar, momentLocalizer } from 'react-big-calendar';
@@ -31,6 +32,7 @@ const startOfMonth = moment().startOf('month').format('YYYY-MM-DD');
 const endOfMonth = moment().endOf('month').format('YYYY-MM-DD');
 
 const Calendar = () => {
+  const queryClient = useQueryClient();
   const {
     auth_user,
     departments,
@@ -822,6 +824,7 @@ const Calendar = () => {
             }
             const allEvents = await fetchEventsForYearMonth(year, month);
             setEvents(allEvents);
+            queryClient.invalidateQueries({ queryKey: ['approvals'] });
             successNotification({ title: "Success", message: "Time charge updated successfully." });
           } else {
             errorNotification({ title: "Error", message: apiResult?.message || "Failed to update time charge. Please try again." });
@@ -840,6 +843,7 @@ const Calendar = () => {
             }
             const allEvents = await fetchEventsForYearMonth(year, month);
             setEvents(allEvents);
+            queryClient.invalidateQueries({ queryKey: ['approvals'] });
             successNotification({ title: "Success", message: "Time charge created successfully." });
           } else {
             errorNotification({ title: "Error", message: apiResult?.message || "Failed to create time charge. Please try again." });
@@ -1250,6 +1254,7 @@ const Calendar = () => {
               show={showModal}
               onClose={closeModal}
               modalStatus={modalStatus}
+              setModalStatus={setModalStatus}
               modalType={modalType}
               setModalType={setModalType}
               timeFields={timeFields}

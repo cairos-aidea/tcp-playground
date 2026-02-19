@@ -1,11 +1,24 @@
+import { useEffect, useRef } from "react";
 import { CircleCheck, CircleX, Clock, DatabaseBackup, Hourglass, Calendar as CalendarIcon } from "lucide-react";
 import moment from "moment";
 import { cn } from "@/lib/utils";
 
 const EventCustomizer = ({ view, event, showDragHandles = false }) => {
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (event.isCurrent && containerRef.current) {
+      // Small delay to ensure render is complete
+      setTimeout(() => {
+        containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+    }
+  }, [event.isCurrent]);
+
   if (event.source === "SYNC-SP-LIST" && (view === "day" || view === "week")) {
     return null;
   }
+
 
   // Determine Styles matching visual reference
   let styles = {
@@ -148,7 +161,7 @@ const EventCustomizer = ({ view, event, showDragHandles = false }) => {
 
   // ── Day / Week view: full card ─────────────────────────────────────────
   return (
-    <div className="relative w-full h-full group">
+    <div className="relative w-full h-full group" ref={containerRef}>
       <div
         className={cn(
           "absolute inset-0 w-full min-h-full p-2 flex flex-col rounded-md border transition-all duration-200 ease-in-out",
