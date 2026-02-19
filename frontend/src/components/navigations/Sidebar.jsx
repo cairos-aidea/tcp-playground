@@ -215,7 +215,7 @@ const SidebarComponent = () => {
                     </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarFooter>
-            <SidebarRail />
+
         </Sidebar>
     );
 };

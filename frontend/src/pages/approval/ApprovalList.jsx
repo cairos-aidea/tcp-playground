@@ -86,17 +86,36 @@ const ApprovalList = () => {
       enableHiding: false,
     },
     {
-      accessorKey: "date",
+      accessorKey: "time_charge_date",
       header: "Date",
-      cell: ({ row }) => formatDate(row.original.date)
+      cell: ({ row }) => formatDate(row.original.time_charge_date)
     },
     {
-      accessorKey: "staff_name",
+      id: "employee",
       header: "Employee",
+      cell: ({ row }) => {
+        const user = row.original.user;
+        if (!user) return "-";
+        return (
+          <div className="flex flex-col">
+            <span className="font-medium">{user.first_name} {user.last_name}</span>
+            <span className="text-xs text-muted-foreground">{user.email}</span>
+          </div>
+        );
+      }
     },
     {
-      accessorKey: "project_name",
+      id: "project",
       header: "Project",
+      cell: ({ row }) => {
+        const { project_code, project_label } = row.original;
+        return (
+          <div className="flex flex-col">
+            {project_code && <span className="font-medium">{project_code}</span>}
+            <span>{project_label}</span>
+          </div>
+        );
+      }
     },
     {
       accessorKey: "duration",
