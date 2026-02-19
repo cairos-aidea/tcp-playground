@@ -1,12 +1,22 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useAppData } from "../../../context/AppDataContext";
-import { Plus } from 'lucide-react';
 import { api } from "../../../api/api";
-import HolidaysTable from "./components/HolidaysTable";
-import HolidaysModal from "./components/HolidaysModal";
-import HolidaysDeleteModal from "./components/HolidaysDeleteModal";
-import Search from "../../../components/navigations/Search";
+import PageContainer from "@/components/ui/PageContainer";
+import { DataTable } from "@/components/ui/data-table";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Plus, Search } from "lucide-react";
 import ReactLoading from "react-loading";
+import { columns } from "./components/columns";
+import HolidayDialog from "./components/HolidayDialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 const Holidays = () => {
   const {
@@ -15,29 +25,14 @@ const Holidays = () => {
   } = useAppData();
 
   const [holidays, setHolidays] = useState([]);
-  const [showModal, setShowModal] = useState(false);
-  const [modalMode, setModalMode] = useState("add");
-  const [formHoliday, setFormHoliday] = useState({
-    holiday_title: "",
-    holiday_type: "",
-    date: "",
-    isFixedDate: false,
-  });
-
-  // For delete confirmation
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [holidayIdToDelete, setHolidayIdToDelete] = useState(null);
-
-  // Search state and handler
   const [search, setSearch] = useState("");
-  const handleSearchChange = (e) => {
-    setSearch(e.target.value);
-  };
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedHoliday, setSelectedHoliday] = useState(null);
+  const [deleteId, setDeleteId] = useState(null);
 
   useEffect(() => {
     api("holiday_list", headerReq)
       .then((res) => {
-        // If the response is an array, set directly
         if (Array.isArray(res)) {
           setHolidays(res);
         } else if (res?.holidays && Array.isArray(res.holidays)) {
@@ -51,75 +46,81 @@ const Holidays = () => {
       });
   }, [headerReq]);
 
-  // Modal open for add
-  const handleAddHoliday = () => {
-    setModalMode("add");
-    setFormHoliday({
-      holiday_title: "",
-      holiday_type: "",
-      date: "",
-      isFixedDate: false,
-    });
-    setShowModal(true);
+  const filteredHolidays = useMemo(() => {
+    if (!search) return holidays;
+    const lowerSearch = search.toLowerCase();
+    return holidays.filter(
+      (h) =>
+        h.holiday_title?.toLowerCase().includes(lowerSearch) ||
+        h.holiday_type?.toLowerCase().includes(lowerSearch) ||
+        h.date?.includes(lowerSearch)
+    );
+  }, [holidays, search]);
+
+  const handleAdd = () => {
+    setSelectedHoliday(null);
+    setIsDialogOpen(true);
   };
 
-  // Modal open for edit
-  const handleEditHoliday = (holiday) => {
-    setModalMode("edit");
-    setFormHoliday({
-      holiday_title: holiday.holiday_title,
-      holiday_type: holiday.holiday_type,
-      date: holiday.date,
-      isFixedDate: !!holiday.isFixedDate,
-      id: holiday.id,
-    });
-    setShowModal(true);
+  const handleEdit = (holiday) => {
+    setSelectedHoliday(holiday);
+    setIsDialogOpen(true);
   };
 
-  // Save handler for modal (add or edit)
-  const handleModalSave = async () => {
-    if (!formHoliday.holiday_title || !formHoliday.holiday_type || !formHoliday.date) {
-      return;
-    }
-    if (modalMode === "add") {
-      const apiPayload = {
-        holiday_title: formHoliday.holiday_title,
-        holiday_type: formHoliday.holiday_type,
-        date: formHoliday.date,
-        isFixedDate: formHoliday.isFixedDate,
-      };
-      api("holiday_create", headerReq, apiPayload)
-        .then((res) => {
-          // Assume res is the new holiday object with id
-          setHolidays((prev) => [...prev, { ...apiPayload, id: res.id }]);
-          setShowModal(false);
-        })
-        .catch(() => {});
-    } else if (modalMode === "edit") {
-      const apiPayload = {
-        holiday_title: formHoliday.holiday_title,
-        holiday_type: formHoliday.holiday_type,
-        date: formHoliday.date,
-        isFixedDate: formHoliday.isFixedDate,
-      };
-      api("holiday_update", {...headerReq,id: formHoliday.id }, apiPayload)
-        .then((res) => {
-          setHolidays((prev) => prev.map(h => h.id === formHoliday.id ? { ...h, ...apiPayload } : h));
-          setShowModal(false);
-        })
-        .catch(() => {});
-    }
+  const handleDeleteClick = (holiday) => {
+    setDeleteId(holiday.id);
   };
 
-  // Delete handler
-  const handleDelete = (id) => {
-    api("holiday_delete", {...headerReq, id })
+  const confirmDelete = () => {
+    if (!deleteId) return;
+    api("holiday_delete", { ...headerReq, id: deleteId })
       .then(() => {
-        setHolidays(prev => prev.filter(holiday => holiday.id !== id));
+        setHolidays((prev) => prev.filter((h) => h.id !== deleteId));
+        setDeleteId(null);
       })
-      .catch(() => {});
-    setDeleteModalVisible(false);
-    setHolidayIdToDelete(null);
+      .catch(() => {
+        alert("Deletion failed.");
+      });
+  };
+
+  const handleSave = (formData) => {
+    if (!formData.holiday_title || !formData.holiday_type || !formData.date) return;
+
+    const payload = {
+      holiday_title: formData.holiday_title,
+      holiday_type: formData.holiday_type,
+      date: formData.date,
+      isFixedDate: formData.isFixedDate,
+    };
+
+    if (selectedHoliday) {
+      // Update
+      api("holiday_update", { ...headerReq, id: selectedHoliday.id }, payload)
+        .then(() => {
+          setHolidays((prev) =>
+            prev.map((h) =>
+              h.id === selectedHoliday.id ? { ...h, ...payload } : h
+            )
+          );
+          setIsDialogOpen(false);
+        })
+        .catch(() => {
+          alert("Update failed.");
+        });
+    } else {
+      // Create
+      api("holiday_create", headerReq, payload)
+        .then((res) => {
+          setHolidays((prev) => [
+            ...prev,
+            { ...payload, id: res.id },
+          ]);
+          setIsDialogOpen(false);
+        })
+        .catch(() => {
+          alert("Creation failed.");
+        });
+    }
   };
 
   useEffect(() => {
@@ -127,77 +128,63 @@ const Holidays = () => {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      <div className="container-fluid h-full">
-        {showModal && (
-          <HolidaysModal
-            show={showModal}
-            modalMode={modalMode}
-            formHoliday={formHoliday}
-            setFormHoliday={setFormHoliday}
-            onClose={() => setShowModal(false)}
-            onSave={handleModalSave}
-          />
-        )}
-
-        {deleteModalVisible && (
-          <HolidaysDeleteModal
-            holidayId={holidayIdToDelete}
-            setModalVisible={setDeleteModalVisible}
-            onDelete={handleDelete}
-          />
-        )}
-
-        <div className="w-full sticky top-0 bg-white flex justify-between items-center border-b p-3 z-10">
-          {/* <Pagination
-            currentPage={page}
-            lastPage={totalPages}
-            totalPages={totalPages}
-            totalRecords={departments.length}
-            onPageChange={setPage}
-          /> */}
-          <h1 className="text-xl font-semibold text-gray-700">Holidays</h1>
-            
-          <div className="flex gap-3 justify-end w-full">
-            <Search
-              value={search}
-              onChange={handleSearchChange}
-              placeholder="Search holiday"
-            />
-            <div
-              className="flex items-center bg-gray-100 hover:bg-gray-200 rounded-full transition-all duration-300 shadow-sm cursor-pointer min-h-[40px] px-3"
-              onClick={handleAddHoliday}
-              style={{ minHeight: 40 }}
-            >
-              <span className="flex items-center justify-center text-gray-500">
-                <Plus size={20} />
-              </span>
+    <PageContainer>
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">Holidays</h2>
+            <p className="text-muted-foreground">Manage holidays and non-working days.</p>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-64">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search holidays..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8"
+              />
             </div>
+            <Button onClick={handleAdd} size="icon" variant="outline">
+              <Plus className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-12 h-[calc(100vh-8rem)] overflow-y-auto">
-          <div className="col-span-12 flex flex-col overflow-x-auto h-full">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-screen bg-gray-100 w-full">
-                <ReactLoading type="bars" color="#888888" height={50} width={50} />
-              </div>
-            ) : (
-              <div className="overflow-auto h-full flex flex-col pb-20 sm:pb-4">
-                <HolidaysTable
-                  holidays={holidays}
-                  onEdit={handleEditHoliday}
-                  onDelete={(id) => {
-                    setHolidayIdToDelete(id);
-                    setDeleteModalVisible(true);
-                  }}
-                />
-              </div>
-            )}
+        {isLoading ? (
+          <div className="flex h-[400px] items-center justify-center">
+            <ReactLoading type="bars" color="#888888" />
           </div>
-        </div>
+        ) : (
+          <DataTable
+            columns={columns(handleEdit, handleDeleteClick)}
+            data={filteredHolidays}
+          />
+        )}
+
+        <HolidayDialog
+          open={isDialogOpen}
+          onOpenChange={setIsDialogOpen}
+          holiday={selectedHoliday}
+          onSave={handleSave}
+        />
+
+        <Dialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirm Deletion</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete this holiday? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteId(null)}>Cancel</Button>
+              <Button variant="destructive" onClick={confirmDelete}>Delete</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
-    </div>
+    </PageContainer>
   );
 };
 

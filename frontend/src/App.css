@@ -554,84 +554,16 @@ table th, table td { text-align: left; }
   border-radius: 2px;
 }
 
-.rbc-event { background-color: transparent !important; color: inherit !important; padding: 0px; text-align: center; }
-.custom-rbc-event-content {
-  padding: 7px 5px;
-  text-wrap: wrap;
-  font-size: 13px;
-  text-align: center;
-}
-
-.titleDisplay { display:inline-block; }
-.titleDisplay.overTime {
-  font-weight: 500 !important;
-  font-style: italic;
-}
-
-.custom-rbc-event-content h4 { font-weight: 400; }
+.rbc-event { background-color: transparent !important; color: inherit !important; padding: 0px; text-align: left; }
 .rbc-event.rbc-event-allday { background-color: transparent; padding: 0px 5px; }
 .rbc-row-segment { padding: 2px 7px !important; }
-
-.rbc-event.submitted {
-  background-color: #65CEBE !important;
-  color: #fff !important;
-}
-
-.rbc-event.IN_REVIEW {
-  background-color: #fcc18c !important;
-}
-
-.rbc-event.draft {
-  background-color: #6c757d!important;
-}
-
-.rbc-event.draft * { color: #fff; }
-i.encoding_status { text-transform: uppercase; }
-
-.rbc-event.pending {
-  background-color: #FEDCBF !important;
-  color: #555 !important;
-}
-
-.rbc-event.declined {
-  background-color: #3D2D27 !important;
-  color: #fff !important;
-}
-
-.rbc-event.approved {
-  background-color: #E26C3A !important;
-  color: #fff !important;
-}
-
-.rbc-event.leave, tr.review_data.leave td, tr.review_data.holiday td, .rbc-event.holiday {
-  background-color: #652e00 !important;
-  color: #fff !important;
-  font-weight: 600;
-  font-style: italic;
-  text-align: center;
-}
-
-.rbc-event.meeting, tr.review_data.meeting td, tr.review_data.meeting td, .rbc-event.meeting {
-  background-color: #7d7d7d !important;
-  color: #fff !important;
-  text-align: center;
-}
-
-tr.review_data.leave.partial td {
-  text-align: left;
-} 
 
 .rbc-event.rbc-selected, .rbc-day-slot .rbc-selected.rbc-background-event,
 .rbc-event.rbc-selected, .rbc-day-slot .rbc-selected.rbc-background-event {
   background: transparent;
 }
 
-.react-select-dropdown.is-invalid-select {
-  border: 1px solid #dc3545;
-}
-
-.rbc-off-range-bg, .weekend { background-color: #f6f6f6 !important; }
-.rbc-day-bg.has-alarm { background-color: #e79d9d; }
+.rbc-off-range-bg { background-color: #f9f9f9 !important; }
 
 /* ################################# CALENDAR STYLING ################################# */
 

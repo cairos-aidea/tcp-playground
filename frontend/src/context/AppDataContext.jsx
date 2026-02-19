@@ -30,7 +30,7 @@ export const AppDataProvider = ({ children }) => {
   const leaveTypes = ["Annual Leave", "Sick Leave", "Unpaid Leave"];
   const rankOrder = ["Vice President", "Senior Associate", "Manager 4", "Manager 3", "Manager 2", "Manager 1", "Expert 4", "Expert 3", "Expert 2", "Expert 1", "Intermediate", "Band 3", "Band 2", "Band 1"];
 
-   const loadCached = async () => {
+  const loadCached = async () => {
     const [
       cachedProjects,
       cachedStages,
@@ -140,7 +140,7 @@ export const AppDataProvider = ({ children }) => {
   //       api("subsidiaries", headerReq, null),
   //       api("departments_list", headerReq, null)
   //     ]);
-      
+
   //     setProjects(projectsData);  // project external
   //     setProjectStages(projectStagesData);
   //     setProjectsInternal(projectsInternalData);
@@ -148,7 +148,7 @@ export const AppDataProvider = ({ children }) => {
   //     setStaffs(staffsData);
   //     setSubsidiaries(subsidiariesData);
   //     setDepartments(departmentsData);
-      
+
   //   } catch (error) {
   //     // console.error('Error fetching data:', error);
   //   } finally {
@@ -174,7 +174,7 @@ export const AppDataProvider = ({ children }) => {
   const fetchApproversList = async (page = 1, filter = null, perPage = 25) => {
     setIsLoading(true);
     const headerParams = { ...headerReq, page, per_page: perPage };
-    
+
     try {
       const result = await api("approvers_list", headerParams, filter);
       setTimeCharges(result);
@@ -186,7 +186,7 @@ export const AppDataProvider = ({ children }) => {
       setIsLoading(false);
     }
   };
-  
+
   // Fetch calendar data
   // const fetchCalendarData = async (startDate, endDate, year) => {
   //   setIsLoading(true);
@@ -197,7 +197,7 @@ export const AppDataProvider = ({ children }) => {
   //     end_date: endDate,
   //     user_id: auth_user_data.id
   //   };
-    
+
   //   try {
   //     const [
   //       timeChargesData, 
@@ -213,7 +213,7 @@ export const AppDataProvider = ({ children }) => {
 
   //     setHolidaysCalendar(holidaysData);
   //     setLeaves(leavesData);
-      
+
   //     return {
   //       timeCharges: timeChargesData,
   //       meetings: meetingsData,
@@ -234,7 +234,7 @@ export const AppDataProvider = ({ children }) => {
       ...headerReq,
       year: year,
       month: month,
-      user_id: auth_user_data.id, 
+      user_id: auth_user_data.id,
     };
 
     try {
@@ -319,7 +319,7 @@ export const AppDataProvider = ({ children }) => {
       year,
       start_date: startDate,
       end_date: endDate,
-      user_id: auth_user_data.id, 
+      user_id: auth_user_data.id,
     };
 
     try {
@@ -394,7 +394,7 @@ export const AppDataProvider = ({ children }) => {
 
     // Header request
     headerReq,
-    
+
     // State
     isLoading,
 
@@ -402,7 +402,7 @@ export const AppDataProvider = ({ children }) => {
     activities,
     leaveTypes,
     rankOrder,
-    
+
     // Methods
     fetchInitialData,
     fetchApproversList,
@@ -413,14 +413,26 @@ export const AppDataProvider = ({ children }) => {
     fetchMeetings,
     fetchHolidays,
     fetchLeaves,
+    fetchDepartmentalTasks: async () => {
+      setIsLoading(true);
+      try {
+        const data = await api("departmental_tasks", headerReq, null);
+        setDepartmentalTasks(data);
+        return data;
+      } catch (error) {
+        console.error("Error fetching departmental tasks:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    },
     fetchOtherExpenses,
-    
+
     // Setters
     setProjects,
     setProjectStages,
     setTimeCharges,
   };
-  
+
   return (
     <AppDataContext.Provider value={value}>
       {children}

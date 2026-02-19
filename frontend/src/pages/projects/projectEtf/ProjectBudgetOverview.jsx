@@ -1,5 +1,12 @@
 import { AlertCircle, TrendingUp, TrendingDown } from "lucide-react";
 import { COLUMN_INFOS } from "./constants";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export const ProjectBudgetOverview = ({
   budgetRes,
@@ -48,13 +55,13 @@ export const ProjectBudgetOverview = ({
 
   // Define columns for the new layout
   const budgetColumns = [
-    { label: "Aidea Fee", value: net_aidea_fee, bg: "bg-gray-200" },
+    { label: "Aidea Fee", value: net_aidea_fee, bg: "bg-gray-50 from-gray-50 to-white" },
     // { label: "Direct Cost", value: direct_cost, bg: "bg-gray-200" },
-    { label: "Total Manpower Budget", value: manpower_budget, bg: "bg-gray-200" },
+    { label: "Total Manpower Budget", value: manpower_budget, bg: "bg-gray-50" },
     {
       label: "Consumed Budget",
       value: consumed,
-      bg: "bg-gray-200",
+      bg: "bg-gray-50",
       subtext: `Up to ${(() => {
         const now = new Date();
         const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -67,13 +74,13 @@ export const ProjectBudgetOverview = ({
     {
       label: "Remaining Budget",
       value: remainingBudget,
-      bg: remainingBudget >= 0 ? "bg-gray-200" : "bg-red-100",
+      bg: remainingBudget >= 0 ? "bg-gray-50" : "bg-red-50 border-red-200",
       type: "remaining",
     },
     {
       label: "Plan Cost",
       value: plan,
-      bg: "bg-gray-200",
+      bg: "bg-gray-50",
       subtext: `From ${(() => {
         const now = new Date();
         return now.toLocaleString("default", {
@@ -85,14 +92,14 @@ export const ProjectBudgetOverview = ({
     {
       label: isTrendingUp ? "Current Profit" : "Current Loss",
       value: currentProfit,
-      bg: isTrendingUp ? "bg-green-100" : "bg-red-200",
+      bg: isTrendingUp ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200",
       isProfit: isTrendingUp,
       showTrend: true,
     },
     {
       label: isTrendingUp ? "Current Profitability" : "Current Loss Rate",
       value: profitability,
-      bg: isTrendingUp ? "bg-gray-200" : "bg-red-100",
+      bg: isTrendingUp ? "bg-gray-50" : "bg-red-50 border-red-200",
       isProfit: isTrendingUp,
       showTrend: false,
       // subtext: `${profitability.toFixed(2)}%`,
@@ -110,86 +117,71 @@ export const ProjectBudgetOverview = ({
         const isPositive = item.value >= 0;
 
         return (
-          <div
+          <Card
             key={item.label}
-            className="flex flex-col justify-between h-full w-full min-w-0 bg-white border border-gray-200 rounded-lg px-4 py-2 relative"
+            className={`flex flex-col justify-between h-full min-w-0 shadow-sm rounded-md border ${item.bg}`}
             style={{ flex: 1, maxHeight: "70px", height: "70px" }}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between text-[12px] font-medium text-gray-600">
-              <div className="flex items-center gap-1">
-                {item.label}
+            <CardContent className="p-3 flex flex-col justify-between h-full relative">
+              {/* Header */}
+              <div className="flex items-center justify-between text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                <div className="flex items-center gap-1">
+                  {item.label}
 
-                {/* Trend icon */}
-                {item.showTrend &&
-                  (isPositive ? (
-                    <TrendingUp size={14} className="text-green-600" />
-                  ) : (
-                    <TrendingDown size={14} className="text-red-600" />
-                  ))}
+                  {/* Trend icon */}
+                  {item.showTrend &&
+                    (isPositive ? (
+                      <TrendingUp size={14} className="text-green-600" />
+                    ) : (
+                      <TrendingDown size={14} className="text-red-600" />
+                    ))}
 
-                {/* Info hover */}
-                <div className="relative group ml-1">
-                  <AlertCircle
-                    size={13}
-                    className="text-gray-400 cursor-pointer"
-                  />
-                  <div
-                    className="absolute z-10 left-5 top-0 hidden group-hover:block bg-white border border-gray-200 rounded shadow-lg p-2 w-64 text-xs text-gray-700"
-                    style={{
-                      right: "auto",
-                      left: "1.25rem",
-                      transform: "none",
-                      maxWidth: "16rem",
-                    }}
-                    onMouseEnter={e => {
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      const overflowRight = rect.right > window.innerWidth;
-                      const overflowLeft = rect.left < 0;
-                      if (overflowRight) {
-                        e.currentTarget.style.left = "auto";
-                        e.currentTarget.style.right = "1.25rem";
-                      } else if (overflowLeft) {
-                        e.currentTarget.style.left = "0";
-                      }
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.left = "1.25rem";
-                      e.currentTarget.style.right = "auto";
-                    }}
-                  >
-                    <div className="font-semibold mb-1">Computation</div>
-                    <div className="mb-2">{info.formula}</div>
-                    <div className="font-semibold mb-1">Description</div>
-                    <div>{info.description}</div>
+                  {/* Info hover */}
+                  <div className="relative group ml-1">
+                    <TooltipProvider delayDuration={100}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <AlertCircle
+                            size={12}
+                            className="text-gray-400 cursor-pointer hover:text-primary transition-colors"
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="max-w-xs text-xs p-3">
+                          <div className="font-semibold mb-1">Computation</div>
+                          <div className="mb-2 font-mono text-[10px] bg-muted/50 p-1 rounded">{info.formula}</div>
+                          <div className="font-semibold mb-1">Description</div>
+                          <div>{info.description}</div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Value & Subtext */}
-            <div className="flex flex-col items-start justify-center flex-1">
-              <div
-                className={`text-xl font-bold truncate ${item.type === "remaining"
-                  ? isPositive
-                    ? "text-green-700"
-                    : "text-red-700"
-                  : "text-gray-900"
-                  }`}
-              >
-                {item.isPercentage
-                  ? `${typeof item.value === "number" ? item.value.toFixed(2) : item.value}%`
-                  : `₱${typeof item.value === "number"
-                    ? item.value.toLocaleString()
-                    : item.value}`}
-              </div>
-              {item.subtext && (
-                <div className="text-[10px] text-gray-500 leading-tight">
-                  {item.subtext}
+              {/* Value & Subtext */}
+              <div className="flex flex-col items-start justify-center flex-1 mt-0">
+                <div
+                  className={`text-lg font-bold truncate tracking-tight ${item.type === "remaining"
+                    ? isPositive
+                      ? "text-green-700"
+                      : "text-red-700"
+                    : "text-foreground"
+                    }`}
+                >
+                  {item.isPercentage
+                    ? `${typeof item.value === "number" ? item.value.toFixed(2) : item.value}%`
+                    : `₱${typeof item.value === "number"
+                      ? item.value.toLocaleString()
+                      : item.value}`}
                 </div>
-              )}
-            </div>
-          </div>
+                {item.subtext && (
+                  <div className="text-[10px] text-muted-foreground leading-tight">
+                    {item.subtext}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         );
       })}
     </div>

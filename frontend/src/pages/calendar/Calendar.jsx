@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import moment from 'moment';
 import "moment-timezone";
 import { Calendar as BaseCalendar, momentLocalizer } from 'react-big-calendar';
-import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import { api } from '../../api/api';
@@ -12,8 +11,10 @@ import { CustomMonthHeader, CustomWeekHeader } from './components/CustomHeader';
 import CustomDateHeader from './components/CustomDateHeader';
 import CalendarModal from './components/CalendarModal';
 import { errorNotification, successNotification, pendingNotification } from '../../components/notifications/notifications';
-import CustomToolbar from './components/CustomToolbar';
-import { SendHorizonal, SendHorizontal, X, CheckCircle } from 'lucide-react';
+import CalendarToolbar from './components/CalendarToolbar';
+import CalendarLegend from './components/CalendarLegend';
+import CursorTimeTooltip from './components/CursorTimeTooltip';
+import { SendHorizonal, SendHorizontal, X, CheckCircle, Plus } from 'lucide-react';
 import ReactLoading from 'react-loading';
 import Search from '../../components/navigations/Search';
 
@@ -22,8 +23,6 @@ const localizer = momentLocalizer(moment);
 const current_year = moment().year();
 const startOfMonth = moment().startOf('month').format('YYYY-MM-DD');
 const endOfMonth = moment().endOf('month').format('YYYY-MM-DD');
-
-const DragAndDropCalendar = withDragAndDrop(BaseCalendar);
 
 const Calendar = () => {
   const {
@@ -99,6 +98,9 @@ const Calendar = () => {
   const [timeEntryStats, setTimeEntryStats] = useState({});
   const [showSidebarOptions, setShowSidebarOptions] = useState('filter');
 
+  // Slot selection tracking for cursor tooltip
+  const [selectingRange, setSelectingRange] = useState(null);
+
   // Helper: validate event move/resize
   const validateEventChange = (eventId, newStart, newEnd) => {
     let errors = {};
@@ -144,9 +146,8 @@ const Calendar = () => {
     }
     // Prepare payload for edit
     let payload = { ...event };
-    payload.start_time = moment(start).format("YYYY-MM-DD HH:mm:ss");
-    payload.end_time = moment(end).format("YYYY-MM-DD HH:mm:ss");
-    // Use chargeType to determine type
+    payload.start_time = moment(start).format("YYYY-MM-DDTHH:mm");
+    payload.end_time = moment(end).format("YYYY-MM-DDTHH:mm");
     if (event.chargeType === "external") {
       payload = { ...timeFields, ...formExternal, ...payload, time_charge_type: 1 };
     } else if (event.chargeType === "internal") {
@@ -176,8 +177,8 @@ const Calendar = () => {
     }
     // Prepare payload for edit
     let payload = { ...event };
-    payload.start_time = moment(start).format("YYYY-MM-DD HH:mm:ss");
-    payload.end_time = moment(end).format("YYYY-MM-DD HH:mm:ss");
+    payload.start_time = moment(start).format("YYYY-MM-DDTHH:mm");
+    payload.end_time = moment(end).format("YYYY-MM-DDTHH:mm");
     if (event.chargeType === "external") {
       payload = { ...timeFields, ...formExternal, ...payload, time_charge_type: 1 };
     } else if (event.chargeType === "internal") {
@@ -231,11 +232,11 @@ const Calendar = () => {
       is_ot: !!tc.is_ot,
       next_day_ot: !!tc.next_day_ot,
       chargeType:
-        tc.time_charge_type === 1
+        Number(tc.time_charge_type) === 1
           ? "external"
-          : tc.time_charge_type === 2
+          : Number(tc.time_charge_type) === 2
             ? "internal"
-            : tc.time_charge_type === 3
+            : Number(tc.time_charge_type) === 3
               ? "departmental"
               : "",
       project_id: tc.project_id,
@@ -336,7 +337,7 @@ const Calendar = () => {
       setIsEventsLoading(false);
       return yearEventsCache.current[cacheKey];
     }
-    
+
     try {
       const timeCharges = await fetchTimeChargeEvents(year, month);
       const leaves = await fetchLeaveEvents(startOfMonth, endOfMonth, year);
@@ -384,7 +385,7 @@ const Calendar = () => {
       } catch (err) {
         console.error("Error loading initial calendar events:", err);
       } finally {
-        setIsEventsLoading(false);  
+        setIsEventsLoading(false);
       }
     };
 
@@ -419,7 +420,7 @@ const Calendar = () => {
     if (!formExternal.project_id || !timeFields.start_time) return [];
     const selectedProject = (projects || []).find(p => String(p.id) === String(formExternal.project_id));
     const selectedCode = selectedProject ? selectedProject.project_code : "";
-    const entryDate = moment(timeFields.start_time, "YYYY-MM-DD HH:mm:ss");
+    const entryDate = moment(timeFields.start_time);
     const isProbonoOrMarketing = selectedProject && (selectedProject.allow_no_dates === 1);
     return (projectStages || [])
       .filter(stage => {
@@ -515,7 +516,14 @@ const Calendar = () => {
     return "";
   };
 
+  // Called continuously while the user is click-dragging to select a time slot
+  const handleSelecting = ({ start, end }) => {
+    setSelectingRange({ start, end });
+    return true; // returning true allows the selection to continue
+  };
+
   const handleSelectSlot = ({ start, end }) => {
+    setSelectingRange(null);
     setModalStatus("create");
     const now = moment().tz(TIMEZONE);
     let startMoment = moment(start).tz(TIMEZONE);
@@ -531,9 +539,15 @@ const Calendar = () => {
       endMoment = startMoment.clone().add(1, "hour");
     }
 
-    const start_time = startMoment.format("YYYY-MM-DD HH:mm:ss");
-    const end_time = endMoment.format("YYYY-MM-DD HH:mm:ss");
+    let start_time = startMoment.format("YYYY-MM-DDTHH:mm");
+    let end_time = endMoment.format("YYYY-MM-DDTHH:mm");
     const ot_type = getOtType(startMoment, holidays, current_year);
+    if (currentView === "month") {
+      // User requested to always have select start/end time for new charges (from month view click)
+      start_time = "";
+      end_time = "";
+    }
+
     // console.log("Selected slot:", start_time, end_time, "OT Type:", ot_type);
     setShowModal(true);
     setTimeFields(tf => ({
@@ -585,8 +599,8 @@ const Calendar = () => {
       const end = part2 ? moment(part2.end).tz(TIMEZONE) : moment(baseEvent.end).tz(TIMEZONE);
       setTimeFields({
         id: baseEvent.originalId,
-        start_time: start.format("YYYY-MM-DD HH:mm:ss"),
-        end_time: end.format("YYYY-MM-DD HH:mm:ss"),
+        start_time: start.format("YYYY-MM-DDTHH:mm"),
+        end_time: end.format("YYYY-MM-DDTHH:mm"),
         is_ot: baseEvent.is_ot || false,
         next_day_ot: baseEvent.next_day_ot || false,
         ot_type: ot_type || baseEvent.ot_type || "",
@@ -596,8 +610,8 @@ const Calendar = () => {
     } else {
       setTimeFields({
         id: baseEvent.id,
-        start_time: moment(baseEvent.start).format("YYYY-MM-DD HH:mm:ss"),
-        end_time: moment(baseEvent.end).format("YYYY-MM-DD HH:mm:ss"),
+        start_time: moment(baseEvent.start).format("YYYY-MM-DDTHH:mm"),
+        end_time: moment(baseEvent.end).format("YYYY-MM-DDTHH:mm"),
         is_ot: baseEvent.is_ot || false,
         next_day_ot: baseEvent.next_day_ot || false,
         ot_type: ot_type || baseEvent.ot_type || "",
@@ -610,8 +624,8 @@ const Calendar = () => {
       setFormLeave({
         id: baseEvent.id || "",
         leave_code: baseEvent.leave_code || "",
-        start_time: moment(baseEvent.start).format("YYYY-MM-DD HH:mm:ss"),
-        end_time: moment(baseEvent.end).format("YYYY-MM-DD HH:mm:ss"),
+        start_time: moment(baseEvent.start).format("YYYY-MM-DDTHH:mm"),
+        end_time: moment(baseEvent.end).format("YYYY-MM-DDTHH:mm"),
         status: baseEvent.status || ""
       });
     } else {
@@ -688,6 +702,7 @@ const Calendar = () => {
 
     // Prevent submit if there are validation errors
     if (Object.keys(inputErrors).length > 0) {
+      errorNotification({ title: "Validation Error", message: Object.values(inputErrors)[0] });
       return;
     }
 
@@ -709,8 +724,8 @@ const Calendar = () => {
       timeFields.start_time &&
       timeFields.end_time &&
       getDurationMinutes(moment(timeFields.start_time), moment(timeFields.end_time)) >= 540 &&
-      moment(timeFields.start_time, "YYYY-MM-DD HH:mm:ss").hour() <= 10 &&
-      !getOtType(moment(timeFields.start_time, "YYYY-MM-DD HH:mm:ss"), holidays, current_year) &&
+      moment(timeFields.start_time).hour() <= 10 &&
+      !getOtType(moment(timeFields.start_time), holidays, current_year) &&
       (!payload.to_split || payload.to_split === "yes");
 
     const mode = modalStatus === "edit" ? "edit" : "create";
@@ -800,8 +815,9 @@ const Calendar = () => {
             }
             const allEvents = await fetchEventsForYearMonth(year, month);
             setEvents(allEvents);
-            successNotification({ title: "Success", message: "Time charge updated successfully." })
+            successNotification({ title: "Success", message: "Time charge updated successfully." });
           } else {
+            errorNotification({ title: "Error", message: apiResult?.message || "Failed to update time charge. Please try again." });
             return;
           }
         } else {
@@ -817,7 +833,9 @@ const Calendar = () => {
             }
             const allEvents = await fetchEventsForYearMonth(year, month);
             setEvents(allEvents);
+            successNotification({ title: "Success", message: "Time charge created successfully." });
           } else {
+            errorNotification({ title: "Error", message: apiResult?.message || "Failed to create time charge. Please try again." });
             return;
           }
         }
@@ -829,9 +847,11 @@ const Calendar = () => {
         }
       }
 
-      closeModal();
+      // Don't close modal — let user continue navigating days
+      // closeModal();
     } catch (err) {
-      // console.error(err);
+      console.error("Save error:", err);
+      errorNotification({ title: "Error", message: "Something went wrong while saving. Please try again." });
     } finally {
       setLoading(false);
     }
@@ -894,323 +914,361 @@ const Calendar = () => {
   );
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      <div className="container-fluid h-full">
-        <div className="w-full sticky top-0 z-10 bg-white border-b">
-          <div className="flex h-14 items-center justify-between px-6">
-            <h1 className="text-xl font-semibold text-gray-700">Time Charging</h1>
+    <div className="flex flex-col h-[calc(100vh-4rem)] -m-8 overflow-hidden bg-background">
+      <div className="flex-1 flex flex-col p-6 overflow-hidden gap-4">
+        {/* Header */}
+        <div className="flex-none">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight">Time Charging</h1>
+              <p className="text-sm text-muted-foreground">Manage and view all scheduled time logs</p>
+            </div>
 
-            <div className="flex gap-3">
-            {/* <Search
-              placeholder="Search task"
-            /> */}
-          </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setModalStatus("create");
+                  setModalType("timeCharge");
+                  setShowModal(true);
+                  const now = moment();
+                  const startString = now.format("YYYY-MM-DDTHH:mm");
+                  const endString = now.clone().add(1, 'hour').format("YYYY-MM-DDTHH:mm");
+
+                  setTimeFields({
+                    id: "",
+                    start_time: startString,
+                    end_time: endString,
+                    is_ot: false,
+                    next_day_ot: false,
+                    ot_type: "",
+                    remarks: ""
+                  });
+                }}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 py-2"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Log Time
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-12 h-[calc(100vh-4rem)] overflow-hidden sm:overflow-y-auto">
-          <div className="col-span-12 overflow-x-auto h-full flex flex-col pb-20 sm:pb-4 relative">
+        <div className="flex-1 flex flex-col bg-card rounded-xl border shadow-sm overflow-hidden min-h-0">
+          {/* Calendar Content */}
+          <div className="flex-1 min-h-0 relative">
             {isEventsLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white/100 z-50">
+              <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-50">
                 <ReactLoading type="bars" color="#333" height={60} width={60} />
               </div>
             )}
 
-            <BaseCalendar
-              localizer={localizer}
-              events={events}
-              selectable={true}
-              resizable={true}
-              defaultView={"week"}
-              views={["month", "week", "day"]}
-              step={15}
-              timeslots={4}
-              style={{ height: "100%" }}
-              onSelectSlot={handleSelectSlot}
-              onSelectEvent={(e) => handleSelectEvent(e)}
-              view={currentView}
-              onView={setCurrentView}
-              onNavigate={(date) => { handleYearChange(date); }}
-              onEventDrop={['day', 'week'].includes(currentView) ? handleEventDrop : undefined}
-              onEventResize={['day', 'week'].includes(currentView) ? handleEventResize : undefined}
-              draggableAccessor={['day', 'week'].includes(currentView) ? (event => !event.status || !["approved", "declined"].includes((event.status || "").toLowerCase())) : undefined}
-              resizableAccessor={['day', 'week'].includes(currentView) ? (event => !event.status || !["approved", "declined"].includes((event.status || "").toLowerCase())) : undefined}
-              components={{
-                event: (props) => <EventCustomizer {...props} view={currentView} event={props.event} />,
-                month: {
-                  dateHeader: CustomDateHeaderWrapper,
-                  header: (props) => <CustomMonthHeader {...props} />
-                },
-                week: {
-                  header: (props) => <CustomWeekHeader {...props} event={props.event} />
-                },
-                toolbar: (props) => <CustomToolbar {...props} userHireDate={auth_user.hire_date} events={events} showSidebarOptions={showSidebarOptions} setShowSidebarOptions={setShowSidebarOptions} isMobile={windowWidth < 640} />,
-              }}
-              slotPropGetter={(date) => {
-                const day = date.getDay(); // 0 = Sunday, 6 = Saturday
-                const hour = date.getHours();
-                const minute = date.getMinutes();
+            <div className="h-full p-4">
+              <BaseCalendar
+                localizer={localizer}
+                events={events}
+                selectable={true}
+                resizable={true}
+                defaultView={"week"}
+                views={["month", "week", "day"]}
+                step={15}
+                timeslots={4}
+                style={{ height: "100%" }}
+                onSelecting={handleSelecting}
+                onSelectSlot={handleSelectSlot}
+                onSelectEvent={(e) => handleSelectEvent(e)}
+                view={currentView}
+                onView={setCurrentView}
+                onNavigate={(date) => { handleYearChange(date); }}
+                onEventDrop={['day', 'week'].includes(currentView) ? handleEventDrop : undefined}
+                onEventResize={['day', 'week'].includes(currentView) ? handleEventResize : undefined}
+                draggableAccessor={['day', 'week'].includes(currentView) ? (event => !event.status || !["approved", "declined"].includes((event.status || "").toLowerCase())) : undefined}
+                resizableAccessor={['day', 'week'].includes(currentView) ? (event => !event.status || !["approved", "declined"].includes((event.status || "").toLowerCase())) : undefined}
+                components={{
+                  event: (props) => <EventCustomizer {...props} view={currentView} event={props.event} />,
+                  month: {
+                    dateHeader: CustomDateHeaderWrapper,
+                    header: (props) => <CustomMonthHeader {...props} />
+                  },
+                  week: {
+                    header: (props) => <CustomWeekHeader {...props} event={props.event} />
+                  },
+                  toolbar: (props) => <CalendarToolbar {...props} userHireDate={auth_user.hire_date} events={events} showSidebarOptions={showSidebarOptions} setShowSidebarOptions={setShowSidebarOptions} isMobile={windowWidth < 640} />,
+                }}
+                slotPropGetter={(date) => {
+                  const day = date.getDay(); // 0 = Sunday, 6 = Saturday
+                  const hour = date.getHours();
+                  const minute = date.getMinutes();
 
-                // --- Holiday check ---
-                // Format date as MM-DD for fixed holidays
-                const mmdd = date.toISOString().slice(5, 10); // "MM-DD"
-                // Format date as YYYY-MM-DD for dynamic holidays
-                const yyyymmdd = date.toISOString().slice(0, 10); // "YYYY-MM-DD"
+                  // --- Holiday check ---
+                  // Format date as MM-DD for fixed holidays
+                  const mmdd = date.toISOString().slice(5, 10); // "MM-DD"
+                  // Format date as YYYY-MM-DD for dynamic holidays
+                  const yyyymmdd = date.toISOString().slice(0, 10); // "YYYY-MM-DD"
 
-                // const isHoliday =
-                //   holidays.fixedHolidays.some(h => h.date === mmdd) ||
-                //   holidays.dynamicHolidays.some(h => h.date === yyyymmdd);
+                  // const isHoliday =
+                  //   holidays.fixedHolidays.some(h => h.date === mmdd) ||
+                  //   holidays.dynamicHolidays.some(h => h.date === yyyymmdd);
 
-                // Only apply highlight if it's a weekday and not a holiday
-                if (day >= 1 && day <= 5) {
-                  // Working hours (7 AM – 7 PM)
-                  if (hour >= 7 && hour < 19) {
-                    // Lunch slot (11:30–12:30)
+                  // Only apply highlight if it's a weekday and not a holiday
+                  if (day >= 1 && day <= 5) {
+                    // Working hours (7 AM – 7 PM)
+                    if (hour >= 7 && hour < 19) {
+                      // Lunch slot (11:30–12:30)
+                      // if ((hour === 11 && minute === 30)) {
+                      //   // Top border broken line at 11:30
+                      //   return { className: "highlight-slot highlight-slot-lunch highlight-slot-lunch-top" };
+                      // }
+                      // if ((hour === 12 && minute === 15)) {
+                      //   // Bottom border broken line at 12:30
+                      //   return { className: "highlight-slot highlight-slot-lunch highlight-slot-lunch-bottom" };
+                      // }
+                      // if ((hour === 11 && minute > 30) || (hour === 12 && minute < 30)) {
+                      //   return { className: "highlight-slot highlight-slot-lunch" };
+                      // }
+                      return { className: "highlight-slot" };
+                    }
+
+                    // Lunch slot outside working hours safeguard
                     // if ((hour === 11 && minute === 30)) {
-                    //   // Top border broken line at 11:30
-                    //   return { className: "highlight-slot highlight-slot-lunch highlight-slot-lunch-top" };
+                    //   return { className: "highlight-slot-lunch highlight-slot-lunch-top" };
                     // }
-                    // if ((hour === 12 && minute === 15)) {
-                    //   // Bottom border broken line at 12:30
-                    //   return { className: "highlight-slot highlight-slot-lunch highlight-slot-lunch-bottom" };
+                    // if ((hour === 12 && minute === 30)) {
+                    //   return { className: "highlight-slot-lunch highlight-slot-lunch-bottom" };
                     // }
                     // if ((hour === 11 && minute > 30) || (hour === 12 && minute < 30)) {
-                    //   return { className: "highlight-slot highlight-slot-lunch" };
+                    //   return { className: "highlight-slot-lunch" };
                     // }
-                    return { className: "highlight-slot" };
                   }
 
-                  // Lunch slot outside working hours safeguard
-                  // if ((hour === 11 && minute === 30)) {
-                  //   return { className: "highlight-slot-lunch highlight-slot-lunch-top" };
-                  // }
-                  // if ((hour === 12 && minute === 30)) {
-                  //   return { className: "highlight-slot-lunch highlight-slot-lunch-bottom" };
-                  // }
-                  // if ((hour === 11 && minute > 30) || (hour === 12 && minute < 30)) {
-                  //   return { className: "highlight-slot-lunch" };
-                  // }
-                }
+                  return {};
+                }}
 
-                return {};
-              }}
-
-            />
-          </div>
-          {/* {showSidebarOptions && (
-            <div className="hidden sm:block col-span-2 sticky border-l transition-all duration-300 overflow-auto h-[calc(100vh-8rem)]">
-              {showSidebarOptions === 'filter' && (
-                <TimeEntrySummary
-                  timeEntries={events.filter(ev => ev.type === "timeCharge")}
-                  selectedDate={moment().toDate()}
-                  calendarView={currentView}
-                />
-              )}
+                eventPropGetter={() => ({
+                  style: {
+                    backgroundColor: "transparent",
+                    border: "none",
+                    padding: 0,
+                    outline: "none",
+                  }
+                })}
+              />
             </div>
-          )} */}
-        </div>
+          </div>
 
-        {showSplitPrompt && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black bg-opacity-30">
-            <div className="bg-white rounded-xl shadow-md w-full max-w-lg relative overflow-hidden max-h-[90vh] flex flex-col">
-              <div className="flex items-center justify-between border-b px-6 py-4 mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">Split Time Charge</h2>
-                <button
-                  className="text-gray-600 hover:text-gray-800"
-                  onClick={() => handleSplitChoice("cancel")}
-                >
-                  <X size={16} />
-                </button>
-              </div>
+          {/* Cursor time tooltip during slot selection */}
+          <CursorTimeTooltip
+            selecting={!!selectingRange}
+            start={selectingRange?.start}
+            end={selectingRange?.end}
+          />
 
-              <div className="px-6 pb-6 overflow-y-auto flex-1">
-                <p className="text-gray-700 text-sm mb-4">
-                  Your time charge entry is eligible for an overtime. Select how you would like to save it.
-                </p>
-                <div className="flex flex-col gap-4">
-                  {/* Option 1: Split into Regular and Overtime */}
+          {/* Footer Legend */}
+          <div className="border-t border-border bg-background">
+            <CalendarLegend />
+          </div>
+
+          {showSplitPrompt && (
+            <div className="fixed inset-0 z-60 flex items-center justify-center bg-black bg-opacity-30">
+              <div className="bg-white rounded-xl shadow-md w-full max-w-lg relative overflow-hidden max-h-[90vh] flex flex-col">
+                <div className="flex items-center justify-between border-b px-6 py-4 mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900">Split Time Charge</h2>
                   <button
-                    onClick={() => setPendingPayload({ ...pendingPayload, splitOption: "split" })}
-                    className={`border rounded-lg p-4 text-left transition-all duration-200 shadow-sm focus:outline-none ${pendingPayload?.splitOption === "split"
-                      ? "border-primary ring-2 ring-primary bg-primary/5"
-                      : "border-gray-200 hover:border-primary"
-                      }`}
-                    type="button"
+                    className="text-gray-600 hover:text-gray-800"
+                    onClick={() => handleSplitChoice("cancel")}
                   >
-                    {/* Title with icon */}
-                    <div className="flex items-center gap-2">
-                      <CheckCircle
-                        size={20}
-                        className={
-                          pendingPayload?.splitOption === "split"
-                            ? "text-primary"
-                            : "text-gray-300"
-                        }
-                        strokeWidth={2.2}
-                        fill={pendingPayload?.splitOption === "split" ? "#facc15" : "none"}
-                      />
-                      <span className="font-semibold text-gray-900">Split Time: Regular & Overtime</span>
-                    </div>
-
-                    {/* Description to make it user-friendly */}
-                    <p className="text-xs text-gray-700 mb-2">
-                      Automatically split your time charge entry into regular and overtime hours.
-                    </p>
-
-                    {/* Time Charges (shown if data is present) */}
-                    {(() => {
-                      if (!pendingPayload?.start_time || !pendingPayload?.end_time) return null;
-
-                      const start = moment(pendingPayload.start_time);
-                      const end = moment(pendingPayload.end_time);
-                      const totalMinutes = getDurationMinutes(start, end);
-                      const regularHours = Math.min(totalMinutes / 60, 8);
-                      const overtimeHours = Math.max((totalMinutes / 60) - 8, 0);
-                      const regularEnd = end.clone().subtract(overtimeHours, 'hours');
-
-                      return (
-                        <div className="text-xs text-gray-700 space-y-2">
-                          <div className="flex items-start gap-2">
-                            <span className="text-orange-500 font-medium">⏱ Time Charge #1 (Regular)</span>
-                            <span>
-                              {regularHours.toFixed(2)}h — {start.format("hh:mm A")} to {regularEnd.format("hh:mm A")}
-                            </span>
-                          </div>
-                          <div className="flex items-start gap-2">
-                            <span className="text-orange-500 font-medium">⏱ Time Charge #2 (Overtime)</span>
-                            {overtimeHours > 0 ? (
-                              <span>
-                                {overtimeHours.toFixed(2)}h — {regularEnd.format("hh:mm A")} to {end.format("hh:mm A")}
-                              </span>
-                            ) : (
-                              <span>0.00h</span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </button>
-
-                  {/* Option 2: All Regular */}
-                  <button
-                    onClick={() => setPendingPayload({ ...pendingPayload, splitOption: "regular" })}
-                    className={`border rounded-lg p-4 text-left transition-all duration-200 shadow-sm focus:outline-none ${pendingPayload?.splitOption === "regular"
-                      ? "border-primary ring-2 ring-primary bg-primary/5"
-                      : "border-gray-200 hover:border-primary"
-                      }`}
-                    type="button"
-                  >
-                    {/* Header with icon */}
-                    <div className="flex items-center gap-2">
-                      <CheckCircle
-                        size={20}
-                        className={
-                          pendingPayload?.splitOption === "regular"
-                            ? "text-primary"
-                            : "text-gray-300"
-                        }
-                        strokeWidth={2.2}
-                        fill={pendingPayload?.splitOption === "regular" ? "#facc15" : "none"}
-                      />
-                      <span className="font-semibold text-gray-900">Save All as Regular</span>
-                    </div>
-
-                    {/* Description */}
-                    <p className="text-xs text-gray-700 mb-2">
-                      Time charge entry will be saved as regular hours only.
-                    </p>
-
-                    {/* Time summary */}
-                    {(() => {
-                      if (!pendingPayload?.start_time || !pendingPayload?.end_time) return null;
-
-                      const start = moment(pendingPayload.start_time);
-                      const end = moment(pendingPayload.end_time);
-                      const totalMinutes = getDurationMinutes(start, end);
-                      const cappedRegularHours = Math.min(totalMinutes / 60, 8);
-
-                      return (
-                        <div className="text-xs text-gray-700 space-y-1">
-                          <div className="flex items-start gap-2">
-                            <span className="text-orange-500 font-medium">⏱ Time Charge #1 (Regular)</span>
-                            <span>
-                              {cappedRegularHours.toFixed(2)}h — {start.format("hh:mm A")} to {end.format("hh:mm A")}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })()}
+                    <X size={16} />
                   </button>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="flex justify-end gap-3 mt-6">
-                  <button
-                    onClick={async () => {
-                      if (!pendingPayload?.splitOption) return;
-                      // Save based on selection
-                      if (pendingPayload.splitOption === "split") {
-                        await handleSplitChoice("yes");
-                      } else if (pendingPayload.splitOption === "regular") {
-                        await handleSplitChoice("no");
-                      }
-                    }}
-                    className={`px-6 py-2 text-sm text-white rounded-full transition duration-200 ${pendingPayload?.splitOption ? "bg-primary hover:bg-primary-700" : "bg-gray-300 cursor-not-allowed"
-                      }`}
-                    disabled={!pendingPayload?.splitOption}
-                  >
-                    Save
-                  </button>
-                  {/* <button
+                <div className="px-6 pb-6 overflow-y-auto flex-1">
+                  <p className="text-gray-700 text-sm mb-4">
+                    Your time charge entry is eligible for an overtime. Select how you would like to save it.
+                  </p>
+                  <div className="flex flex-col gap-4">
+                    {/* Option 1: Split into Regular and Overtime */}
+                    <button
+                      onClick={() => setPendingPayload({ ...pendingPayload, splitOption: "split" })}
+                      className={`border rounded-lg p-4 text-left transition-all duration-200 shadow-sm focus:outline-none ${pendingPayload?.splitOption === "split"
+                        ? "border-primary ring-2 ring-primary bg-primary/5"
+                        : "border-gray-200 hover:border-primary"
+                        }`}
+                      type="button"
+                    >
+                      {/* Title with icon */}
+                      <div className="flex items-center gap-2">
+                        <CheckCircle
+                          size={20}
+                          className={
+                            pendingPayload?.splitOption === "split"
+                              ? "text-primary"
+                              : "text-gray-300"
+                          }
+                          strokeWidth={2.2}
+                          fill={pendingPayload?.splitOption === "split" ? "#facc15" : "none"}
+                        />
+                        <span className="font-semibold text-gray-900">Split Time: Regular & Overtime</span>
+                      </div>
+
+                      {/* Description to make it user-friendly */}
+                      <p className="text-xs text-gray-700 mb-2">
+                        Automatically split your time charge entry into regular and overtime hours.
+                      </p>
+
+                      {/* Time Charges (shown if data is present) */}
+                      {(() => {
+                        if (!pendingPayload?.start_time || !pendingPayload?.end_time) return null;
+
+                        const start = moment(pendingPayload.start_time);
+                        const end = moment(pendingPayload.end_time);
+                        const totalMinutes = getDurationMinutes(start, end);
+                        const regularHours = Math.min(totalMinutes / 60, 8);
+                        const overtimeHours = Math.max((totalMinutes / 60) - 8, 0);
+                        const regularEnd = end.clone().subtract(overtimeHours, 'hours');
+
+                        return (
+                          <div className="text-xs text-gray-700 space-y-2">
+                            <div className="flex items-start gap-2">
+                              <span className="text-orange-500 font-medium">⏱ Time Charge #1 (Regular)</span>
+                              <span>
+                                {regularHours.toFixed(2)}h — {start.format("hh:mm A")} to {regularEnd.format("hh:mm A")}
+                              </span>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <span className="text-orange-500 font-medium">⏱ Time Charge #2 (Overtime)</span>
+                              {overtimeHours > 0 ? (
+                                <span>
+                                  {overtimeHours.toFixed(2)}h — {regularEnd.format("hh:mm A")} to {end.format("hh:mm A")}
+                                </span>
+                              ) : (
+                                <span>0.00h</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </button>
+
+                    {/* Option 2: All Regular */}
+                    <button
+                      onClick={() => setPendingPayload({ ...pendingPayload, splitOption: "regular" })}
+                      className={`border rounded-lg p-4 text-left transition-all duration-200 shadow-sm focus:outline-none ${pendingPayload?.splitOption === "regular"
+                        ? "border-primary ring-2 ring-primary bg-primary/5"
+                        : "border-gray-200 hover:border-primary"
+                        }`}
+                      type="button"
+                    >
+                      {/* Header with icon */}
+                      <div className="flex items-center gap-2">
+                        <CheckCircle
+                          size={20}
+                          className={
+                            pendingPayload?.splitOption === "regular"
+                              ? "text-primary"
+                              : "text-gray-300"
+                          }
+                          strokeWidth={2.2}
+                          fill={pendingPayload?.splitOption === "regular" ? "#facc15" : "none"}
+                        />
+                        <span className="font-semibold text-gray-900">Save All as Regular</span>
+                      </div>
+
+                      {/* Description */}
+                      <p className="text-xs text-gray-700 mb-2">
+                        Time charge entry will be saved as regular hours only.
+                      </p>
+
+                      {/* Time summary */}
+                      {(() => {
+                        if (!pendingPayload?.start_time || !pendingPayload?.end_time) return null;
+
+                        const start = moment(pendingPayload.start_time);
+                        const end = moment(pendingPayload.end_time);
+                        const totalMinutes = getDurationMinutes(start, end);
+                        const cappedRegularHours = Math.min(totalMinutes / 60, 8);
+
+                        return (
+                          <div className="text-xs text-gray-700 space-y-1">
+                            <div className="flex items-start gap-2">
+                              <span className="text-orange-500 font-medium">⏱ Time Charge #1 (Regular)</span>
+                              <span>
+                                {cappedRegularHours.toFixed(2)}h — {start.format("hh:mm A")} to {end.format("hh:mm A")}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </button>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex justify-end gap-3 mt-6">
+                    <button
+                      onClick={async () => {
+                        if (!pendingPayload?.splitOption) return;
+                        // Save based on selection
+                        if (pendingPayload.splitOption === "split") {
+                          await handleSplitChoice("yes");
+                        } else if (pendingPayload.splitOption === "regular") {
+                          await handleSplitChoice("no");
+                        }
+                      }}
+                      className={`px-6 py-2 text-sm text-white rounded-full transition duration-200 ${pendingPayload?.splitOption ? "bg-primary hover:bg-primary-700" : "bg-gray-300 cursor-not-allowed"
+                        }`}
+                      disabled={!pendingPayload?.splitOption}
+                    >
+                      Save
+                    </button>
+                    {/* <button
             onClick={() => handleSplitChoice("cancel")}
             className="px-6 py-2 text-sm bg-white border border-gray-300 text-gray-700 rounded-full hover:bg-gray-100 transition duration-200"
           >
             Cancel
           </button> */}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {showModal && (
-          <CalendarModal
-            show={showModal}
-            onClose={closeModal}
-            modalStatus={modalStatus}
-            modalType={modalType}
-            setModalType={setModalType}
-            timeFields={timeFields}
-            setTimeFields={setTimeFields}
-            timeChargeOption={timeChargeOption}
-            setTimeChargeOption={setTimeChargeOption}
-            formExternal={formExternal}
-            setFormExternal={setFormExternal}
-            formInternal={formInternal}
-            setFormInternal={setFormInternal}
-            formDepartmental={formDepartmental}
-            setFormDepartmental={setFormDepartmental}
-            formLeave={formLeave}
-            setFormLeave={setFormLeave}
-            events={events}
-            inputErrors={inputErrors}
-            setInputErrors={setInputErrors}
-            // timeWarnings={timeWarnings}
-            externalProjectOptions={externalProjectOptions}
-            externalProjectStages={externalProjectStages}
-            internalProjectOptions={internalProjectOptions}
-            departmentalTaskOptions={departmentalTaskOptions}
-            handleSubmit={handleSubmit}
-            loading={loading}
-            setEvents={setEvents}
-            headerReq={headerReq}
-            setLoading={setLoading}
-            getDurationMinutes={getDurationMinutes}
-            getDayTotals={getDayTotals}
-            auth_user={auth_user}
-            departments={departments}
-          />
-        )}
+          {showModal && (
+            <CalendarModal
+              show={showModal}
+              onClose={closeModal}
+              modalStatus={modalStatus}
+              modalType={modalType}
+              setModalType={setModalType}
+              timeFields={timeFields}
+              setTimeFields={setTimeFields}
+              timeChargeOption={timeChargeOption}
+              setTimeChargeOption={setTimeChargeOption}
+              formExternal={formExternal}
+              setFormExternal={setFormExternal}
+              formInternal={formInternal}
+              setFormInternal={setFormInternal}
+              formDepartmental={formDepartmental}
+              setFormDepartmental={setFormDepartmental}
+              formLeave={formLeave}
+              setFormLeave={setFormLeave}
+              events={events}
+              inputErrors={inputErrors}
+              setInputErrors={setInputErrors}
+              // timeWarnings={timeWarnings}
+              externalProjectOptions={externalProjectOptions}
+              externalProjectStages={externalProjectStages}
+              internalProjectOptions={internalProjectOptions}
+              departmentalTaskOptions={departmentalTaskOptions}
+              handleSubmit={handleSubmit}
+              loading={loading}
+              setEvents={setEvents}
+              headerReq={headerReq}
+              setLoading={setLoading}
+              getDurationMinutes={getDurationMinutes}
+              getDayTotals={getDayTotals}
+              auth_user={auth_user}
+              departments={departments}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

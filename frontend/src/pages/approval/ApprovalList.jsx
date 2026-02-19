@@ -1,350 +1,208 @@
-import React, { useState, useEffect } from 'react';
-import { CheckSquare, XSquare, Filter, ChevronDown, ChevronUp } from 'lucide-react';
-import { api } from '../../api/api';
+import React, { useState, useEffect, useMemo } from 'react';
+import { PageContainer } from "@/components/ui/PageContainer";
+import { DataTable } from "@/components/ui/data-table";
+import { Button } from "@/components/ui/button";
+import { Check, X, Filter, RefreshCw } from 'lucide-react';
 import { useAppData } from '../../context/AppDataContext';
-import ActionModal from './components/ActionModal';
-import FilterSidebar from './components/FilterSidebar';
-import Pagination from './components/Pagination';
-import ApprovalTable from './components/ApprovalTable';
-import ReactLoading from "react-loading";
+import { api } from '../../api/api';
+import { Badge } from "@/components/ui/badge";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import FilterSidebar from './components/FilterSidebar'; // Reuse or refactor this later
+
+// Helper for formatting date
+const formatDate = (dateString) => {
+  if (!dateString) return "-";
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric', month: 'short', day: 'numeric'
+  });
+};
 
 const ApprovalList = () => {
   const {
-    projects,
-    projectStages,
-    staffs,
-    departments,
-    timeCharges,
-    holidays,
-    leaves,
-    auth_user,
+    timeCharges, // { data: [], current_page, etc }
+    fetchApproversList,
     headerReq,
     isLoading,
-    fetchApproversList,
+    // Filter data dependencies...
+    projects, projectStages, staffs, departments, auth_user
   } = useAppData();
 
-  // Local state
-  const [selectedTimeCharges, setSelectedTimeCharges] = useState([]);
-  const [currentTimeCharge, setCurrentTimeCharge] = useState(null);
-  const [isBulk, setIsBulk] = useState(false);
-  const [pageId, setPageId] = useState(1);
-  const [lastPage, setLastPage] = useState(1);
-  const [totalRecords, setTotalRecords] = useState(0);
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
-  const [showSidebarOptions, setShowSidebarOptions] = useState('filter');
-  const [filter, setFilter] = useState({
-    is_ot: false,
-    start_date: null,
-    end_date: null,
-    project_id: null,
-    stage_id: null,
-    staff_id: null,
-    status: null
-  });
-  const [modal, setModal] = useState({
-    type: null,
-    isOpen: false
-  });
-
+  const [page, setPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
-  // const [stats, setStats] = useState({});
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [filter, setFilter] = useState({
+    is_ot: false, start_date: null, end_date: null,
+    project_id: null, stage_id: null, staff_id: null, status: null
+  });
 
+  // Load Data
   useEffect(() => {
-    document.title = "Approval List | Aidea Time Charging";
-    loadInitialData();
-  }, []);
+    fetchApproversList(page, filter, itemsPerPage);
+  }, [page, filter]);
 
-  const loadInitialData = async () => {
+  // Handle Actions
+  const handleAction = async (action, ids) => {
+    if (!ids.length) return;
     try {
-      const result = await fetchApproversList(1, filter, itemsPerPage);
-      setPageId(result.current_page);
-      setLastPage(result.last_page);
-      setTotalRecords(result.total);
-    } catch (error) {
-      console.error('Error in loadInitialData:', error);
+      await api(action, headerReq, { time_charge_ids: ids });
+      fetchApproversList(page, filter, itemsPerPage);
+      setSelectedIds([]);
+    } catch (e) {
+      console.error(e);
     }
   };
 
-  const fetchApprovalList = async (page = 1, perPage = itemsPerPage) => {
-    try {
-      const result = await fetchApproversList(page, filter, perPage);
-      setPageId(result.current_page);
-      setLastPage(result.last_page);
-      setTotalRecords(result.total);
-      return result;
-    } catch (error) {
-      console.error('Error in fetchApprovalList:', error);
-    }
-  };
-
-  const handleRowSelect = (id) => {
-    setSelectedTimeCharges(prev => {
-      const exists = prev.includes(id);
-      return exists
-        ? prev.filter(item => item !== id)
-        : [...prev, id];
-    });
-  };
-
-  const handleSelectAll = () => {
-    const pendingIds = timeCharges.data
-      .filter(item => item.status === 'pending')
-      .map(item => item.id);
-
-    if (
-      selectedTimeCharges.length === pendingIds.length &&
-      pendingIds.every(id => selectedTimeCharges.includes(id))
-    ) {
-      setSelectedTimeCharges([]);
-    } else {
-      setSelectedTimeCharges(pendingIds);
-    }
-  };
-
-  const resetFilter = () => {
-    setFilter({
-      is_ot: false,
-      start_date: null,
-      end_date: null,
-      project_id: null,
-      stage_id: null,
-      staff_id: null,
-      status: null
-    });
-  };
-
-  const applyFilter = () => {
-    fetchApprovalList(1, itemsPerPage);
-  };
-
-  const handleAction = async (action) => {
-    try {
-      const payload = {
-        time_charge_ids: isBulk ? selectedTimeCharges : [currentTimeCharge.id]
-      };
-
-      // console.log(payload);
-
-      await api(action, headerReq, payload);
-
-      // Update local state to reflect changes
-      const newData = [...timeCharges.data];
-      if (isBulk) {
-        selectedTimeCharges.forEach(id => {
-          const index = newData.findIndex(item => item.id === id);
-          if (index !== -1) {
-            newData[index] = {
-              ...newData[index],
-              status: action === 'approve' ? 'approved' :
-                action === 'decline' ? 'declined' : 'pending'
-            };
-          }
-        });
-      } else {
-        const index = newData.findIndex(item => item.id === currentTimeCharge.id);
-        if (index !== -1) {
-          newData[index] = {
-            ...newData[index],
-            status: action === 'approve' ? 'approved' :
-              action === 'decline' ? 'declined' : 'pending'
-          };
-        }
+  const columns = useMemo(() => [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <input
+          type="checkbox"
+          checked={table.getIsAllPageRowsSelected()}
+          onChange={(e) => table.toggleAllPageRowsSelected(!!e.target.checked)}
+          className="translate-y-[2px]"
+        />
+      ),
+      cell: ({ row }) => (
+        <input
+          type="checkbox"
+          checked={row.getIsSelected()}
+          onChange={(e) => row.toggleSelected(!!e.target.checked)}
+          className="translate-y-[2px]"
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: "date",
+      header: "Date",
+      cell: ({ row }) => formatDate(row.original.date)
+    },
+    {
+      accessorKey: "staff_name",
+      header: "Employee",
+    },
+    {
+      accessorKey: "project_name",
+      header: "Project",
+    },
+    {
+      accessorKey: "duration",
+      header: "Duration",
+      cell: ({ row }) => {
+        const hrs = Number(row.original.duration_hrs || 0);
+        const mins = Number(row.original.duration_min || 0);
+        return `${hrs}h ${mins > 0 ? mins + 'm' : ''}`;
       }
-      // Update time charges state
-      timeCharges.data = newData;
-      setSelectedTimeCharges([]);
-      setCurrentTimeCharge(null);
-      setIsBulk(false);
-
-      // Reset state
-      setModal({ type: null, isOpen: false });
-    } catch (error) {
-      console.error(`Error performing ${action} action:`, error);
-    }
-  };
-
-  const openModal = (type, timeCharge = null, bulk = false) => {
-    setCurrentTimeCharge(timeCharge);
-    setIsBulk(bulk);
-    setModal({ type, isOpen: true });
-  };
-
-  const closeModal = () => {
-    setModal({ type: null, isOpen: false });
-    setCurrentTimeCharge(null);
-    setIsBulk(false);
-  };
-
-  const requestSort = (key) => {
-    setSortConfig(prev => {
-      let direction = 'ascending';
-      if (prev.key === key && prev.direction === 'ascending') {
-        direction = 'descending';
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const status = row.original.status || 'pending';
+        const colors = {
+          approved: "bg-emerald-100 text-emerald-800 border-emerald-200",
+          pending: "bg-amber-100 text-amber-800 border-amber-200",
+          declined: "bg-rose-100 text-rose-800 border-rose-200"
+        };
+        return <Badge variant="outline" className={colors[status]}>{status}</Badge>
       }
-      return { key, direction };
-    });
-  };
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => (
+        <div className="flex gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                onClick={() => handleAction('approve', [row.original.id])}
+              >
+                <Check size={16} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Approve</p>
+            </TooltipContent>
+          </Tooltip>
 
-  const renderSortIndicator = (key) => {
-    if (sortConfig.key !== key) {
-      return <ChevronDown className="sort-icon" size={14} />;
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="ghost" className="h-8 w-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                onClick={() => handleAction('decline', [row.original.id])}
+              >
+                <X size={16} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Decline</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="ghost" className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                onClick={() => handleAction('reopen', [row.original.id])}
+              >
+                <RefreshCw size={16} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Reopen</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      )
     }
-    return sortConfig.direction === 'ascending'
-      ? <ChevronUp className="sort-icon active" size={14} />
-      : <ChevronDown className="sort-icon active" size={14} />;
-  };
+  ], []);
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
+  // Filter handlers
+  const resetFilter = () => setFilter({});
+  const applyFilter = () => fetchApproversList(1, filter, itemsPerPage);
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      <div className="container-fluid h-full">
-        <ActionModal
-          isOpen={modal.isOpen}
-          type={modal.type}
-          isBulk={isBulk}
-          onClose={closeModal}
-          onConfirm={() => handleAction(modal.type)}
-          timeCharge={currentTimeCharge}
-          selectedTimeCharges={selectedTimeCharges.map(id =>
-            timeCharges.data.find(item => item.id === id)
-          )}
-        />
-
-        <div className="w-full sticky top-0 bg-white flex justify-between items-center border-b p-3 z-10">
-          <h1 className="text-xl font-semibold text-gray-700">Approval List</h1>
-          {selectedTimeCharges.length > 0 && (
-            <div className="flex gap-3 items-center justify-center ">
-              <span className="text-sm text-gray-700 font-semibold">
-                {selectedTimeCharges.length} item{selectedTimeCharges.length !== 1 ? 's' : ''} selected:
-              </span>
-              <div className="relative flex flex-col items-center group justify-center">
-                <button
-                  type="button"
-                  tabIndex={0}
-                  className="text-white bg-primary hover:bg-primary-hover focus:outline-none focus:ring-4 focus:ring-gray-300 font-medium rounded-full text-sm px-3 py-2"
-                  onClick={() => openModal('approve', null, true)}
-                  onMouseDown={e => e.preventDefault()}
-                >
-                  <CheckSquare size={18} />
-                </button>
-                <div className="absolute justifya top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 whitespace-nowrap z-20">
-                  Approve selected
-                </div>
-              </div>
-              <div className="relative flex flex-col items-center group">
-                <button
-                  type="button"
-                  tabIndex={0}
-                  className="text-gray-700 bg-gray-300 hover:bg-gray-400 focus:outline-none focus:ring-4 focus:ring-gray-300 font-medium rounded-full text-sm px-3 py-2"
-                  onClick={() => openModal('decline', null, true)}
-                  onMouseDown={e => e.preventDefault()}
-                >
-                  <XSquare size={18} />
-                </button>
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 whitespace-nowrap z-20">
-                  Decline selected
-                </div>
-              </div>
-            </div>
-          )}
-          <div className="gap-3 hidden sm:flex">
-            {/* Filter Button */}
-            <div
-              className="flex items-center bg-gray-100 hover:bg-gray-200 rounded-full transition-all duration-300 shadow-sm cursor-pointer min-h-[40px] px-3"
-              onClick={() => setShowSidebarOptions(showSidebarOptions === 'filter' ? null : 'filter')}
-              tabIndex={0}
-              style={{ minHeight: 40 }}
-            >
-              <span className="flex items-center justify-center text-gray-500">
-                <Filter size={18} />
-              </span>
-              <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 whitespace-nowrap z-20">
-                Filter
-              </div>
-            </div>
-
-            {/* Stats Button */}
-            {/* <div className="relative flex flex-col items-center group">
-            <button
-              type="button"
-              tabIndex={0}
-              className={`px-3 py-2 rounded-full border transition-colors duration-200 ${showSidebarOptions === 'stats'
-                ? 'bg-gray-700 text-white border-gray-700'
-                : 'bg-white text-gray-950 border-gray-400 hover:bg-gray-100 hover:text-gray-800'}`}
-              onClick={() => setShowSidebarOptions(showSidebarOptions === 'stats' ? null : 'stats')}
-              onMouseDown={e => e.preventDefault()}
-            >
-              <SquareChartGantt size={18} />
-            </button>
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 whitespace-nowrap z-20">
-              Show stats
-            </div>
-          </div> */}
-
-            {/* Remind Button */}
-            {/* <div className="relative flex flex-col items-center group">
-            <button
-              type="button"
-              tabIndex={0}
-              className={`px-3 py-2 rounded-full border transition-colors duration-200 ${showSidebarOptions === 'remind'
-                ? 'bg-gray-700 text-white border-gray-700'
-                : 'bg-white text-gray-950 border-gray-400 hover:bg-gray-100 hover:text-gray-800'}`}
-              onMouseDown={e => e.preventDefault()}
-            >
-              <SendHorizontal size={18} />
-            </button>
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 whitespace-nowrap z-20">
-              Remind Staffs
-            </div>
-          </div> */}
-          </div>
+    <PageContainer>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Approvals</h2>
+          <p className="text-muted-foreground">Review and approve time charges.</p>
         </div>
-
-        <div className="grid grid-cols-12 flex-1 overflow-hidden sm:overflow-y-auto">
-          <div className={`${showSidebarOptions ? 'col-span-12 sm:col-span-10' : 'col-span-12'} h-[calc(100vh-8rem)] overflow-x-auto flex flex-col pb-20 sm:pb-0`}>
-            {isLoading ? (
-              <div className="flex items-center justify-center h-screen bg-gray-100">
-                <ReactLoading type="bars" color="#888888" height={50} width={50} />
-              </div>
-            ) : (
-              <div className="col-span-12 overflow-auto h-full flex flex-col pb-10 sm:pb-0">
-                <ApprovalTable
-                  data={timeCharges.data}
-                  selectedTimeCharges={selectedTimeCharges}
-                  handleRowSelect={handleRowSelect}
-                  handleSelectAll={handleSelectAll}
-                  requestSort={requestSort}
-                  renderSortIndicator={renderSortIndicator}
-                  formatDate={formatDate}
-                  openModal={openModal}
-                  sortConfig={sortConfig}
-                />
-              </div>
-
-            )}
-          </div>
-          {showSidebarOptions && (
-            <div className="hidden sm:block col-span-2 sticky border-l transition-all duration-300 overflow-auto h-[calc(100vh-8rem)]">
-              {/* {showSidebarOptions === 'stats' && (
-              <TimeChargeStats
-                authUser={auth_user}
-                departments={departments}
-                staffs={staffs}
-                holidays={holidays}
-                leaves={leaves}
-                headerReq={headerReq}
-                setStats={setStats}
-              />
-            )} */}
-              {showSidebarOptions === 'filter' && (
+        <div className="flex items-center gap-2">
+          {selectedIds.length > 0 && (
+            <div className="flex gap-2 animate-in fade-in slide-in-from-right-4">
+              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => handleAction('approve', selectedIds)}>
+                Approve ({selectedIds.length})
+              </Button>
+              <Button size="sm" variant="destructive" onClick={() => handleAction('decline', selectedIds)}>
+                Decline ({selectedIds.length})
+              </Button>
+              <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white" onClick={() => handleAction('reopen', selectedIds)}>
+                Reopen ({selectedIds.length})
+              </Button>
+            </div>
+          )}
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline"><Filter className="mr-2 h-4 w-4" /> Filter</Button>
+            </SheetTrigger>
+            <SheetContent>
+              <SheetHeader>
+                <SheetTitle>Filter Requests</SheetTitle>
+              </SheetHeader>
+              <div className="mt-4">
+                {/* Reuse FilterSidebar logic or components here via generic children or direct reuse if compatible */}
                 <FilterSidebar
                   projects={projects}
                   projectStages={projectStages}
@@ -355,22 +213,22 @@ const ApprovalList = () => {
                   resetFilter={resetFilter}
                   auth_user={auth_user}
                 />
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="w-full sticky bottom-0 bg-white flex justify-center items-center border-t p-3 z-10">
-          <Pagination
-            currentPage={pageId}
-            lastPage={lastPage}
-            totalRecords={totalRecords}
-            itemsPerPage={itemsPerPage}
-            onPageChange={(page) => fetchApprovalList(page, itemsPerPage)}
-          />
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
-    </div>
+
+      <DataTable
+        columns={columns}
+        data={timeCharges?.data || []}
+        loading={isLoading}
+        onRowSelectionChange={(rows) => setSelectedIds(rows.map(r => r.original.id))}
+      />
+      {/* Pagination Control needed if DataTable doesn't handle server-side paging built-in 
+            For now assuming DataTable handles local or we add a footer pagination 
+        */}
+    </PageContainer>
   );
 };
 

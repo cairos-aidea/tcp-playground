@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useAppData } from "../../../context/AppDataContext";
-import Search from "../../../components/navigations/Search";
+import PageContainer from "@/components/ui/PageContainer";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Search, History, FolderOpen } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 const RECENT_PROJECTS_KEY = "recentOpenedProjects";
 
@@ -45,8 +51,6 @@ const ETFSelection = ({ onSelectProject }) => {
         project.project_status !== "Aborted Proposal" &&
         (project.project_name.toLowerCase().includes(search.toLowerCase()) ||
           project.project_code.toLowerCase().includes(search.toLowerCase()))
-      // && project.studio_id === auth_user.department.id
-      // && project.studio_id === 30
     );
 
   // Get recent opened projects that are in filteredProjects
@@ -59,152 +63,144 @@ const ETFSelection = ({ onSelectProject }) => {
     p => !recentOpenedProjects.some(rp => rp.id === p.id)
   );
 
-  // Row component for project
-  const ProjectRow = ({ project, onClick, lastOpened }) => (
-    <button
-      type="button"
-      className="w-full flex items-center justify-between px-4 py-3 border-b hover:bg-blue-50 transition cursor-pointer text-left text-gray-800"
-      onClick={() => onClick(project)}
-    >
-      <div>
-        <div className="font-semibold text-base sm:text-lg">{project.project_name}</div>
-        <div className="text-sm text-gray-600">{project.project_code}</div>
-        {lastOpened && (
-          <div className="text-xs text-blue-500 mt-1">
-            Last opened: {lastOpened}
-          </div>
-        )}
-      </div>
-    </button>
-  );
-
   return (
-    <div className="flex flex-col min-h-screen h-screen bg-gray-50">
-      <div className="container-fluid flex-1 flex flex-col h-full max-h-full">
-        {/* Header remains unchanged */}
-        <div className="w-full sticky top-0 z-10 bg-white border-b">
-          <div className="flex h-14 items-center justify-between px-6">
-            <h1 className="text-xl font-semibold text-gray-700">ETF</h1>
-            <div className="flex gap-3">
-              {/* <Search placeholder="Search task" /> */}
-            </div>
+    <PageContainer>
+      <div className="flex flex-col items-center justify-start min-h-[calc(100vh-100px)] py-10">
+        <div className="w-full max-w-5xl space-y-6">
+          <div className="text-center space-y-2">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">ETF Management</h1>
+            <p className="text-muted-foreground">Select a project to manage Estimated Time of Force (ETF) and Manpower Allocation.</p>
           </div>
-        </div>
 
-        <div className="flex-1 flex flex-col items-center justify-center px-0 py-0 min-h-0 h-full max-h-full">
-          <div className="w-full h-full bg-white border border-gray-200 p-0 flex flex-col min-h-0 max-h-full overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between px-6 pt-6 pb-2 gap-2">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-700">Select a Project</h2>
-
-              <Search
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search project"
-              />
-            </div>
-
-            <div className="flex-1 min-h-0 max-h-full overflow-auto px-6 pb-6">
-              <table className="min-w-full h-full table-auto border-separate border-spacing-0 text-sm">
-                <thead>
-                  <tr className="bg-gray-100 text-gray-700 sticky top-0 z-10">
-                    <th className="px-4 py-3 font-medium text-left rounded-tl-xl">Project Name</th>
-                    <th className="px-4 py-3 font-medium text-left">Code</th>
-                    <th className="px-4 py-3 font-medium text-left">Status</th>
-                    <th className="px-4 py-3 font-medium text-left">Last Opened</th>
-                    <th className="px-4 py-3 font-medium text-left rounded-tr-xl">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
+          <Card className="border-border shadow-sm">
+            <CardHeader className="pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-lg">Projects</CardTitle>
+                  <CardDescription>Search and select a project to proceed.</CardDescription>
+                </div>
+                <div className="relative w-full sm:w-72">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search project name or code..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-8 bg-muted/50"
+                  />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50 hover:bg-muted/50">
+                    <TableHead className="w-[40%]">Project Name</TableHead>
+                    <TableHead>Code</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Last Opened</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {/* Recent Projects Section */}
                   {recentOpenedProjects.length > 0 && (
                     <>
-                      <tr className="h-16">
-                        <td colSpan={5} className="bg-gray-50 text-xs text-indigo-600 font-semibold px-4 py-2 border-b align-middle">Recent Projects</td>
-                      </tr>
+                      <TableRow className="hover:bg-transparent bg-muted/10">
+                        <TableCell colSpan={5} className="font-semibold text-xs text-muted-foreground uppercase tracking-wider py-2">
+                          <div className="flex items-center gap-2">
+                            <History className="h-3 w-3" /> Recent Projects
+                          </div>
+                        </TableCell>
+                      </TableRow>
                       {recentOpenedProjects.map((project) => {
                         const rp = recentProjects.find(rp => rp.id === project.id);
                         let lastOpened = "";
                         if (rp && rp.openedAt) {
                           const date = new Date(rp.openedAt);
-                          lastOpened = date.toLocaleString();
+                          lastOpened = date.toLocaleDateString() + " " + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                         }
                         return (
-                          <tr key={project.id} className="hover:bg-blue-50 transition border-b h-16">
-                            <td className="px-4 py-3 font-semibold text-base sm:text-lg">{project.project_name}</td>
-                            <td className="px-4 py-3 text-gray-600">{project.project_code}</td>
-                            <td className="px-4 py-3 text-gray-500">{project.project_status}</td>
-                            <td className="px-4 py-3 text-blue-500">{lastOpened}</td>
-                            <td className="px-4 py-3">
-                              <button
-                                type="button"
-                                className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 shadow-sm hover:shadow"
-                                onClick={() => handleProjectClick(project)}
-                              >
-                                Open
-                              </button>
-                            </td>
-                          </tr>
+                          <TableRow key={project.id} className="group cursor-pointer hover:bg-muted/50" onClick={() => handleProjectClick(project)}>
+                            <TableCell className="font-medium">
+                              <div className="flex flex-col">
+                                <span className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{project.project_name}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">{project.project_code}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="font-normal text-xs">{project.project_status}</Badge>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{lastOpened}</TableCell>
+                            <TableCell className="text-right">
+                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                                <FolderOpen className="h-4 w-4 text-primary" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
                         );
                       })}
-                      <tr className="h-16">
-                        <td colSpan={5} className="bg-gray-50 text-xs text-right px-4 py-2 border-b align-middle">
-                          <button
-                            type="button"
-                            className="text-xs text-indigo-500 hover:text-indigo-700 flex items-center gap-1"
-                            onClick={() => {
-                              setRecentProjects([]);
-                              localStorage.removeItem(RECENT_PROJECTS_KEY);
-                            }}
-                          >
-                            <span>Clear Recent</span>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <line x1="18" y1="6" x2="6" y2="18" />
-                              <line x1="6" y1="6" x2="18" y2="18" />
-                            </svg>
-                          </button>
-                        </td>
-                      </tr>
                     </>
                   )}
 
-                  {/* Other Projects */}
+                  {/* All Projects Section */}
                   {otherProjects.length > 0 && (
                     <>
-                      <tr className="h-16">
-                        <td colSpan={5} className="bg-gray-50 text-xs text-gray-600 font-semibold px-4 py-2 border-b align-middle">All Projects</td>
-                      </tr>
+                      <TableRow className="hover:bg-transparent bg-muted/10 border-t">
+                        <TableCell colSpan={5} className="font-semibold text-xs text-muted-foreground uppercase tracking-wider py-2">
+                          All Projects
+                        </TableCell>
+                      </TableRow>
                       {otherProjects.map((project) => (
-                        <tr key={project.id} className="hover:bg-blue-50 transition border-b h-16">
-                          <td className="px-4 py-3 font-semibold text-base sm:text-lg">{project.project_name}</td>
-                          <td className="px-4 py-3 text-gray-600">{project.project_code}</td>
-                          <td className="px-4 py-3 text-gray-500">{project.project_status}</td>
-                          <td className="px-4 py-3">-</td>
-                          <td className="px-4 py-3">
-                            <button
-                              type="button"
-                              className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 shadow-sm hover:shadow"
-                              onClick={() => handleProjectClick(project)}
-                            >
-                              Open
-                            </button>
-                          </td>
-                        </tr>
+                        <TableRow key={project.id} className="group cursor-pointer hover:bg-muted/50" onClick={() => handleProjectClick(project)}>
+                          <TableCell className="font-medium">
+                            <div className="flex flex-col">
+                              <span className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{project.project_name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">{project.project_code}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="font-normal text-xs">{project.project_status}</Badge>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">-</TableCell>
+                          <TableCell className="text-right">
+                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                              <FolderOpen className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
                       ))}
                     </>
                   )}
 
-                  {/* No Projects Found */}
                   {filteredProjects.length === 0 && (
-                    <tr className="h-16">
-                      <td colSpan={5} className="py-8 text-center text-gray-400">No projects found.</td>
-                    </tr>
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-24 text-center">
+                        No projects found.
+                      </TableCell>
+                    </TableRow>
                   )}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {recentProjects.length > 0 && (
+            <div className="flex justify-center">
+              <Button
+                variant="link"
+                className="text-xs text-muted-foreground hover:text-destructive"
+                onClick={() => {
+                  setRecentProjects([]);
+                  localStorage.removeItem(RECENT_PROJECTS_KEY);
+                }}
+              >
+                Clear Recent History
+              </Button>
             </div>
-          </div>
+          )}
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 };
 

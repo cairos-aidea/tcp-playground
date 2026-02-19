@@ -1,36 +1,32 @@
+import moment from 'moment';
+import { cn } from '@/lib/utils';
+
 export const CustomMonthHeader = ({ label }) => {
   return (
-    <div className="text-xs font-bold text-gray-600 uppercase text-center py-3">
+    <div className="text-sm font-medium text-muted-foreground text-center py-3">
       {label}
     </div>
   );
 };
 
-export const CustomWeekHeader = ({ label }) => {
-  // Expect label format: "11 MON" or "MON 11"
-  let day = '';
-  let weekday = '';
+export const CustomWeekHeader = ({ label, date }) => {
+  const dateObj = date;
+  const isToday = moment(dateObj).isSame(moment(), 'day');
 
-  // Try to extract day and weekday from label
-  const parts = label.split(' ');
-  if (parts.length === 2) {
-    // Check which part is the day (number)
-    if (!isNaN(parts[0])) {
-      day = parts[0];
-      weekday = parts[1];
-    } else {
-      weekday = parts[0];
-      day = parts[1];
-    }
-  } else {
-    // Fallback: show label as weekday, empty day
-    weekday = label;
-  }
+  const weekday = moment(dateObj).format('ddd');
+  const dayNum = moment(dateObj).format('D');
 
   return (
-    <div className="flex flex-col items-center py-3">
-      <span className="text-xs font-bold text-gray-700 uppercase">{weekday}</span>
-      <span className="text-2xl font-extrabold text-gray-800">{day}</span>
+    <div className={cn("flex flex-col items-center py-3 gap-0.5", isToday && "")}>
+      <span className="text-sm font-medium text-muted-foreground">
+        {weekday}
+      </span>
+      <div className={cn(
+        "flex items-center justify-center w-8 h-8 rounded-full text-lg font-semibold mt-1 transition-colors leading-none",
+        isToday ? "bg-primary text-primary-foreground" : "text-foreground"
+      )}>
+        {dayNum}
+      </div>
     </div>
   );
 };

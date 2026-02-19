@@ -92,7 +92,7 @@ const App = () => {
 
   return (
     <AppDataProvider>
-      <Router>
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
           {/* Public Routes */}
           <Route
@@ -117,7 +117,7 @@ const App = () => {
             }
           />
 
-          <Route 
+          <Route
             path="/projects/budget"
             element={
               <PrivateRoute>
@@ -151,7 +151,7 @@ const App = () => {
                 }
               </PrivateRoute>
             }
-          />          
+          />
 
           {/* Projects: manager or admin only */}
           <Route

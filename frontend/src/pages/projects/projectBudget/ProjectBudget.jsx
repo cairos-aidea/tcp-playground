@@ -6,6 +6,12 @@ import { api } from '../../../api/api';
 import { Pencil, Lock, Save, Eye, Info, SquareX, Plus, Loader2, Archive, MessageCircleWarning } from 'lucide-react';
 import ProjectBudgetConfirmModal from './components/projectBudgetConfirmModal';
 import GlobalSelect from "../../../components/layouts/GlobalSelect";
+import PageContainer from "@/components/ui/PageContainer";
+import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { Link } from 'react-router-dom';
 
 const ProjectBudget = () => {
@@ -531,506 +537,288 @@ const ProjectBudget = () => {
   );
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50">
-      <div className="container-fluid h-full">
-        <div className="w-full sticky top-0 z-10 bg-white border-b">
-          <div className="flex h-14 items-center justify-between px-6">
-            <h1 className="text-xl font-semibold text-gray-700">Project Budget</h1>
-
-            {isLatestVersion && selectedProjectId && (
-              <button
-                onClick={() => setShowConfirmModal(true)}
-                className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 shadow-sm hover:shadow"
-              >
-                <Lock size={16} />
-                Lock Version {latestVersionNumber + 1}
-              </button>
-            )}
-          </div>
+    <PageContainer>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Project Budget</h2>
+          <p className="text-muted-foreground">Manage project budgets and allocations.</p>
         </div>
 
-        {/* Main content */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 h-[calc(100vh-6rem)] overflow-y-auto">
-          <div className="col-span-12 overflow-x-auto h-full flex flex-col">
-            <div className="col-span-12 h-full flex flex-col gap-2 p-4 overflow-auto">
-              <div className="bg-white rounded-xl border border-slate-200 p-5 md:p-6 shadow-sm mb-4">
-                <h3 className="text-base md:text-lg font-semibold text-slate-800 mb-4">
-                  Project Details
-                </h3>
-                {/* Selection Section */}
-                <div className="mb-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Project Code */}
-                    <div className="flex flex-col gap-2">
-                      <label className="text-sm font-medium text-slate-700">
-                        Project Code
-                      </label>
-                      <Select
-                        className="text-sm"
-                        options={projectCodeOptions}
-                        placeholder="Select Project Code"
-                        value={projectCodeOptions.find(opt => opt.value === selectedProjectId) || null}
-                        onChange={handleProjectCodeChange}
-                        isClearable
-                      />
-                    </div>
-
-                    {/* Project Name */}
-                    <div className="flex flex-col gap-2">
-                      <label className="text-sm font-medium text-slate-700">
-                        Project Name
-                      </label>
-                      <Select
-                        className="text-sm"
-                        options={projectNameOptions}
-                        placeholder="Select Project Name"
-                        value={projectNameOptions.find(opt => opt.value === selectedProjectId) || null}
-                        onChange={handleProjectNameChange}
-                        isClearable
-                      />
-                    </div>
-
-                    {/* Version Selector */}
-                    <div className="flex flex-col gap-2">
-                      <label className="text-sm font-medium text-slate-700">
-                        Project Budget Version
-                      </label>
-
-                      <Select
-                        className="text-sm"
-                        options={
-                          versions.length === 0
-                            ? []
-                            : [...versions]
-                              .sort((a, b) => b.id - a.id)
-                              .map(v => ({
-                                label:
-                                  v.version_number === 0
-                                    ? "Current Version"
-                                    : `Version ${v.version_number}`,
-                                value: v.id,
-                              }))
-                        }
-                        placeholder={
-                          versions.length === 0 ? "No versions available" : "Select Version"
-                        }
-                        value={
-                          versions.length === 0
-                            ? null
-                            : (() => {
-                              const selected = versions.find(
-                                v => String(v.id) === String(selectedVersionId)
-                              );
-                              return selected
-                                ? {
-                                  label:
-                                    selected.version_number === 0
-                                      ? "Current Version"
-                                      : `Version ${selected.version_number}`,
-                                  value: selectedVersionId,
-                                }
-                                : null;
-                            })()
-                        }
-                        onChange={option =>
-                          setSelectedVersionId(option ? option.value : "")
-                        }
-                        isClearable
-                        isDisabled={!selectedProjectId || loadingVersions}
-                      />
-                    </div>
-                  </div>
-                </div>
-                {/* Reference Section */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  {/* Client */}
-                  <div className="flex flex-col gap-1">
-                    <label className="text-sm font-medium text-slate-700">Client</label>
-                    <span className="px-3 py-2 rounded-md bg-slate-50 text-sm text-slate-900">
-                      {selectedProject?.client?.name || (
-                        <span className="italic text-slate-400">
-                          No client available
-                        </span>
-                      )}
-                    </span>
-                  </div>
-
-                  {/* Studio */}
-                  <div className="flex flex-col gap-1">
-                    <label className="text-sm font-medium text-slate-700">
-                      Project Studio
-                    </label>
-                    <span className="px-3 py-2 rounded-md bg-slate-50 text-sm text-slate-900">
-                      {selectedProject?.project_studio?.name || (
-                        <span className="italic text-slate-400">
-                          No studio available
-                        </span>
-                      )}
-                    </span>
-                  </div>
-
-                  {/* Manager */}
-                  <div className="flex flex-col gap-1">
-                    <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                      Project Manager
-                      {versions.length > 0 &&
-                        selectedProject?.owner?.name &&
-                        currentVersion?.project_manager?.name &&
-                        selectedProject.owner.name !==
-                        currentVersion.project_manager.name && (
-                          <span className="text-xs text-amber-600 flex items-center gap-1">
-                            <Info size={14} />
-                            New assignment
-                          </span>
-                        )}
-                    </label>
-
-                    <span className="px-3 py-2 rounded-md bg-slate-50 text-sm text-slate-900">
-                      {versions.length === 0
-                        ? selectedProject?.owner?.name ||
-                        selectedProject?.project_manager?.name || (
-                          <span className="italic text-slate-400">
-                            No manager available
-                          </span>
-                        )
-                        : currentVersion?.project_manager?.name || (
-                          <span className="italic text-slate-400">
-                            No manager available
-                          </span>
-                        )}
-                    </span>
-                  </div>
-
-                  {/* Architect */}
-                  <div className="flex flex-col gap-1">
-                    <label className="text-sm font-medium text-slate-700">
-                      Project Architect
-                    </label>
-
-                    {isLatestVersion ? (
-                      <Select
-                        className="text-sm"
-                        options={architectOptions}
-                        value={selectedArchitect}
-                        onChange={handleArchitectChange}
-                        placeholder="Select Architect"
-                        isClearable
-                      />
-                    ) : (
-                      <span className="px-3 py-2 rounded-md bg-slate-50 text-sm text-slate-900">
-                        {versions.length === 0
-                          ? selectedProject?.project_architect?.name || ""
-                          : versions.find(v => String(v.id) === String(selectedVersionId))
-                            ?.project_architect?.name ||
-                          [...versions]
-                            .sort((a, b) => b.id - a.id)[0]
-                            ?.project_architect?.name ||
-                          ""}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Loading for budget versions */}
-              {loadingVersions ? (
-                <div className="flex flex-col items-center justify-center py-16">
-                  <ReactLoading type="bars" color="#94a3b8" height={24} width={56} />
-                </div>
-              ) : budgetAllocation ? (
-                <>
-                  <div className="grid grid-cols-12 gap-4 mb-4">
-                    {/* 2nd row: 3 cards, each 1/3 width */}
-                    <div className="col-span-12 md:col-span-4">
-                      <div className="bg-white rounded-lg border border-slate-200 p-6 h-full">
-                        <h3 className="text-base md:text-lg font-semibold text-slate-800 mb-4">
-                          Budget Allocation
-                        </h3>
-
-                        <div className="space-y-5">
-                          <div>
-                            <div className="flex justify-between items-center py-2">
-                              <span className="text-sm text-slate-600">
-                                Contract Fee (VAT Inc.)
-                              </span>
-                              <span className="text-base font-semibold text-slate-800 tabular-nums">
-                                ₱{Number(budgetAllocation.contract_fee ?? 0).toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}
-                              </span>
-                            </div>
-
-                            <div className="flex justify-between items-center py-2">
-                              <span className="text-sm text-slate-600">VAT Rate</span>
-                              <span className="text-sm font-medium text-slate-700">
-                                {Number(budgetAllocation.vat_percentage ?? 0).toFixed(2)}%
-                              </span>
-                            </div>
-
-                            <div className="flex justify-between items-center py-2">
-                              <span className="text-sm text-slate-600">
-                                Contract Fee (VAT Excl.)
-                              </span>
-                              <span className="text-sm font-medium text-slate-800 tabular-nums">
-                                ₱{Number(budgetSummary.contractFeeVatExcl ?? 0).toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}
-                              </span>
-                            </div>
-
-                            <div className="flex justify-between py-2">
-                              <span className="text-sm text-slate-600">
-                                Direct Cost (VAT Inc.)
-                              </span>
-                              <span className="text-sm font-medium tabular-nums">
-                                ₱{directCost.toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}
-                              </span>
-                            </div>
-
-                            <div className="flex justify-between py-2">
-                              <span className="text-sm text-slate-600">Net Aidea Fee</span>
-                              <span className="text-sm font-semibold text-slate-800 tabular-nums">
-                                ₱{budgetSummary.netAideaFee.toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}
-                              </span>
-                            </div>
-
-                            <div className="flex justify-between py-2">
-                              <span className="text-sm text-slate-600">Target Profitability</span>
-                              <span className="text-sm font-medium">
-                                {budgetSummary.targetProfitability.toFixed(2)}%
-                              </span>
-                            </div>
-
-                            <div className="flex justify-between py-2">
-                              <span className="text-sm text-slate-600">
-                                Target Profit Amount
-                              </span>
-                              <span className="text-sm font-medium tabular-nums">
-                                ₱{budgetSummary.targetProfitAmount.toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}
-                              </span>
-                            </div>
-
-                            <div className="border-t">
-                              <div className="flex justify-between items-center py-2">
-                                <span className="text-sm font-semibold text-gray-700">Manpower Budget</span>
-                                <span className="text-base font-bold text-slate-700 tabular-nums">
-                                  ₱{budgetSummary.manpowerBudget.toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="col-span-12 md:col-span-4">
-                      <div className="bg-white rounded-xl border border-slate-200 p-5 md:p-6 shadow-sm h-full flex flex-col">
-                        <h3 className="text-base md:text-lg font-semibold text-slate-800 mb-4">Subcon Expenses</h3>
-                        <div className="flex-1 min-h-0 overflow-y-auto max-h-[320px] divide-y divide-gray-200">
-                          {subconExpenses.length === 0 ? (
-                            <div className="py-3 text-gray-400 text-sm italic">No subcon expenses.</div>
-                          ) : (
-                            subconExpenses.map((exp, idx) => (
-                              <div key={exp.id || idx} className="flex items-center justify-between py-2">
-                                <div className="flex items-center">
-                                  <div>
-                                    <span className="text-sm font-medium text-gray-500">
-                                      {exp.trade || exp.consultant_type || "Subcon"}
-                                    </span>
-                                    <div className="text-xxs text-gray-500">
-                                      {exp.subcon_name || exp.consultant_type || "Subcon"}
-                                    </div>
-                                  </div>
-                                </div>
-                                <span className="text-lg font-bold text-slate-700">
-                                  ₱{Number(exp.budget_allocated ?? 0).toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2
-                                  })}
-                                </span>
-                              </div>
-                            ))
-                          )
-                          }
-                        </div>
-                        {/* Sticky footer for total */}
-                        <div className="bg-white border-t border-gray-200 mt-4 pt-3 pb-2 z-10 flex-shrink-0">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-semibold text-gray-700">Total</span>
-                            <span className="text-lg font-bold text-slate-700">
-                              ₱{sumSubconExpenses.toLocaleString(undefined, {
-                                minimumFractionDigits: 2, maximumFractionDigits: 2
-                              })}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Other Expenses */}
-                    <div className="col-span-12 md:col-span-4">
-                      <div className="bg-white rounded-xl border border-slate-200 p-5 md:p-6 shadow-sm h-full flex flex-col">
-                        <h3 className="text-base md:text-lg font-semibold text-slate-800 mb-4">Other Expenses</h3>
-                        <div className="flex-1 min-h-0 overflow-y-auto max-h-[320px] divide-y divide-gray-200">
-                          {otherExpenses.length === 0 && !isLatestVersion ? (
-                            <div className="py-3 text-gray-400 text-sm italic">No other expenses.</div>
-                          ) : (
-                            <>
-                              {otherExpenses.map((exp, idx) => {
-                                const isNew = !exp.id;
-                                // Editable if current version is selected OR if no versions exist but budgetAllocation is present
-                                const isEditable = isCurrentVersionSelected && (isNew || exp.is_draft === 1)
-                                  || (versions.length === 0 && budgetAllocation);
-                                return (
-                                  <div key={exp.id || idx} className="flex items-center justify-between py-3 px-1 group">
-                                    <div className="flex flex-col">
-                                      {isEditable ? (
-                                        editingCell.idx === idx && editingCell.field === "expense_type" ? (
-                                          <GlobalSelect
-                                            options={expenseTypeOptions}
-                                            value={expenseTypeOptions.find(opt => opt.label === exp.expense_type) || null}
-                                            onChange={option => handleExpenseChange(idx, "expense_type", option)}
-                                            onBlur={() => handleExpenseBlur(idx, "expense_type")}
-                                            placeholder="Select Expense Type"
-                                            autoFocus
-                                            className="w-50 text-xs font-medium text-gray-900 italic"
-                                            menuPortalTarget={document.body}
-                                            menuPosition="fixed"
-                                            styles={{ menuPortal: base => ({ ...base, zIndex: 99999 }) }}
-                                          />
-                                        ) : (
-                                          <span
-                                            className="flex items-center text-sm font-medium text-gray-900 cursor-pointer hover:underline"
-                                            onClick={() => setEditingCell({ idx, field: "expense_type" })}
-                                            tabIndex={0}
-                                            onKeyDown={e => { if (e.key === "Enter" || e.key === " ") setEditingCell({ idx, field: "expense_type" }); }}
-                                          >
-                                            {exp.expense_type || <span className="text-gray-400 italic">Expense Type</span>}
-                                          </span>
-                                        )
-                                      ) : (
-                                        <span className="flex items-center text-xs font-medium text-gray-500">{exp.expense_type || "Subcon"}</span>
-                                      )}
-                                    </div>
-                                    <div className="flex items-center relative group-hover:gap-6 transition-all duration-300">
-                                      {isEditable ? (
-                                        editingCell.idx === idx && editingCell.field === "budget_allocated" ? (
-                                          <input type="number" min="0" step="0.01" autoFocus
-                                            className="form-input w-40 px-2 py-1 mr-6 border border-blue-400 rounded text-lg font-bold text-slate-700 text-right"
-                                            value={exp.budget_allocated} onChange={e => handleExpenseChange(idx, "budget_allocated", e.target.value)}
-                                            onBlur={() => handleExpenseBlur(idx, "budget_allocated")}
-                                            onKeyDown={e => { if (e.key === "Enter" || e.key === "Tab") { handleExpenseBlur(idx, "budget_allocated"); } }}
-                                          />
-                                        ) : (
-                                          <span
-                                            className="text-lg font-bold text-slate-700 transition-all duration-300 translate-x-[-1.5rem]"
-                                            onClick={() => setEditingCell({ idx, field: "budget_allocated" })}
-                                            tabIndex={0}
-                                            onKeyDown={e => { if (e.key === "Enter" || e.key === " ") setEditingCell({ idx, field: "budget_allocated" }); }}
-                                          >
-                                            {exp.budget_allocated
-                                              ? `₱${Number(exp.budget_allocated).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                                              : <span className="text-gray-400">0.00</span>}
-                                          </span>
-                                        )
-                                      ) : (
-                                        <span className="text-lg font-bold text-slate-700">
-                                          ₱{Number(exp.budget_allocated ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </span>
-                                      )}
-                                      {/* Conditional delete button */}
-                                      {isEditable && (
-                                        <button type="button"
-                                          className="absolute right-0 text-gray-400 hover:text-red-500 opacity-100 transition-all duration-300"
-                                          onClick={() => handleDeleteExpense(idx)}
-                                          aria-label="Delete"
-                                          disabled={deletingIdx === idx}
-                                        >
-                                          {deletingIdx === idx ? (
-                                            <Loader2 className="animate-spin w-4 h-4" />
-                                          ) : (
-                                            <SquareX size={16} />
-                                          )}
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                              {/* Conditional Add Expense button */}
-                              {(isCurrentVersionSelected || (versions.length === 0 && budgetAllocation)) && (
-                                <div className="py-3 flex justify-center">
-                                  <button className="text-gray-500 hover:text-blue-600 flex items-center gap-2 text-sm transition" onClick={handleAddExpense}>
-                                    <Plus className="w-4 h-4" />
-                                    Add Expense
-                                  </button>
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </div>
-
-                        {/* Sticky footer for total */}
-                        <div className="bg-white border-t border-gray-200 mt-4 pt-3 pb-2 z-10 flex-shrink-0">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-semibold text-gray-700">Total</span>
-                            <span className="text-lg font-bold text-slate-700">
-                              ₱{sumOtherExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="col-span-12">
-                  <div className="p-6 h-full flex items-center justify-center">
-                        <p className="text-gray-300 italic">No project budget available.</p>
-                      </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        {budgetAllocation && (
-          <footer className="sticky  bg-white bottom-0 border-t border-slate-200 px-6 py-2 z-10">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2 text-xs text-slate-600">
-                {currentVersion && currentVersion.created_at && (
-                  <span>
-                    <span className="font-medium">Version Created:</span> {new Date(currentVersion.created_at).toLocaleString()}
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={() => window.open("https://wkf.ms/48dUIJq", "_blank")}
-                className="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-100 transition-colors border border-red-100"
-              >
-                <MessageCircleWarning size={16} />
-                Report a Problem
-              </button>
-            </div>
-          </footer>
+        {isLatestVersion && selectedProjectId && (
+          <Button
+            onClick={() => setShowConfirmModal(true)}
+            className="gap-2"
+          >
+            <Lock size={16} />
+            Lock Version {latestVersionNumber + 1}
+          </Button>
         )}
       </div>
-      {/* Confirm Modal */}
+
+      <div className="space-y-6">
+        {/* Project Details Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Project Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <div className="space-y-2">
+                <Label>Project Code</Label>
+                <Select
+                  className="text-sm"
+                  options={projectCodeOptions}
+                  placeholder="Select Code"
+                  value={projectCodeOptions.find(opt => opt.value === selectedProjectId) || null}
+                  onChange={handleProjectCodeChange}
+                  isClearable
+                  styles={{ control: (base) => ({ ...base, borderColor: 'hsl(var(--input))', borderRadius: 'var(--radius)' }) }}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Project Name</Label>
+                <Select
+                  className="text-sm"
+                  options={projectNameOptions}
+                  placeholder="Select Name"
+                  value={projectNameOptions.find(opt => opt.value === selectedProjectId) || null}
+                  onChange={handleProjectNameChange}
+                  isClearable
+                  styles={{ control: (base) => ({ ...base, borderColor: 'hsl(var(--input))', borderRadius: 'var(--radius)' }) }}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Budget Version</Label>
+                <Select
+                  className="text-sm"
+                  options={versions.sort((a, b) => b.id - a.id).map(v => ({
+                    label: v.version_number === 0 ? "Current Version" : `Version ${v.version_number}`,
+                    value: v.id
+                  }))}
+                  placeholder={versions.length === 0 ? "No versions" : "Select Version"}
+                  value={versions.length === 0 ? null : (selectedVersionId ? {
+                    label: versions.find(v => String(v.id) === String(selectedVersionId))?.version_number === 0 ? "Current Version" : `Version ${versions.find(v => String(v.id) === String(selectedVersionId))?.version_number}`,
+                    value: selectedVersionId
+                  } : null)}
+                  onChange={option => setSelectedVersionId(option ? option.value : "")}
+                  isClearable
+                  isDisabled={!selectedProjectId || loadingVersions}
+                  styles={{ control: (base) => ({ ...base, borderColor: 'hsl(var(--input))', borderRadius: 'var(--radius)' }) }}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="space-y-1">
+                <Label className="text-muted-foreground">Client</Label>
+                <div className="p-2 bg-muted rounded-md text-sm font-medium">
+                  {selectedProject?.client?.name || <span className="italic text-muted-foreground">No client</span>}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-muted-foreground">Studio</Label>
+                <div className="p-2 bg-muted rounded-md text-sm font-medium">
+                  {selectedProject?.project_studio?.name || <span className="italic text-muted-foreground">No studio</span>}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-muted-foreground">Manager</Label>
+                <div className="p-2 bg-muted rounded-md text-sm font-medium">
+                  {currentVersion?.project_manager?.name || selectedProject?.owner?.name || <span className="italic text-muted-foreground">No manager</span>}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-muted-foreground">Architect</Label>
+                {isLatestVersion ? (
+                  <Select
+                    className="text-sm"
+                    options={architectOptions}
+                    value={selectedArchitect}
+                    onChange={handleArchitectChange}
+                    placeholder="Select Architect"
+                    isClearable
+                    styles={{ control: (base) => ({ ...base, borderColor: 'hsl(var(--input))', borderRadius: 'var(--radius)' }) }}
+                  />
+                ) : (
+                  <div className="p-2 bg-muted rounded-md text-sm font-medium">
+                    {versions.find(v => String(v.id) === String(selectedVersionId))?.project_architect?.name || <span className="italic text-muted-foreground">No architect</span>}
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {loadingVersions ? (
+          <div className="flex justify-center p-8"><Loader2 className="animate-spin text-muted-foreground" /></div>
+        ) : budgetAllocation ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Budget Allocation */}
+            <Card className="h-full">
+              <CardHeader><CardTitle className="text-lg">Allocation</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Contract Fee (VAT Inc.)</span>
+                  <span className="font-semibold">₱{Number(budgetAllocation.contract_fee ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">VAT Rate</span>
+                  <span>{Number(budgetAllocation.vat_percentage ?? 0).toFixed(2)}%</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Contract Fee (VAT Excl.)</span>
+                  <span className="font-medium">₱{Number(budgetSummary.contractFeeVatExcl ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm pt-2 border-t">
+                  <span className="text-muted-foreground">Direct Cost</span>
+                  <span className="font-medium">₱{directCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm pt-2 border-t font-semibold">
+                  <span className="text-muted-foreground">Net Aidea Fee</span>
+                  <span>₱{budgetSummary.netAideaFee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="space-y-2 pt-4 border-t">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Target Profit</span>
+                    <span>{budgetSummary.targetProfitability.toFixed(2)}%</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-semibold text-emerald-600">
+                    <span>Manpower Budget</span>
+                    <span>₱{budgetSummary.manpowerBudget.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Subcon Expenses */}
+            <Card className="h-full flex flex-col">
+              <CardHeader><CardTitle className="text-lg">Subcon Expenses</CardTitle></CardHeader>
+              <CardContent className="flex-1 overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Type</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {subconExpenses.length === 0 ? (
+                      <TableRow><TableCell colSpan={2} className="text-center text-muted-foreground italic">No expenses</TableCell></TableRow>
+                    ) : (
+                      subconExpenses.map((exp, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell>
+                            <div className="font-medium">{exp.trade || "Subcon"}</div>
+                            <div className="text-xs text-muted-foreground">{exp.subcon_name || "Unknown"}</div>
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            ₱{Number(exp.budget_allocated ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+              <div className="p-4 border-t bg-muted/20 flex justify-between font-bold text-sm">
+                <span>Total</span>
+                <span>₱{sumSubconExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              </div>
+            </Card>
+
+            {/* Other Expenses */}
+            <Card className="h-full flex flex-col">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-lg">Other Expenses</CardTitle>
+                {(isCurrentVersionSelected || (versions.length === 0 && budgetAllocation)) && (
+                  <Button variant="ghost" size="sm" onClick={handleAddExpense}><Plus className="h-4 w-4 mr-1" /> Add</Button>
+                )}
+              </CardHeader>
+              <CardContent className="flex-1 overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Type</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="w-[40px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {otherExpenses.length === 0 && !isLatestVersion ? (
+                      <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground italic">No expenses</TableCell></TableRow>
+                    ) : (
+                      otherExpenses.map((exp, idx) => {
+                        const isNew = !exp.id;
+                        const isEditable = isCurrentVersionSelected && (isNew || exp.is_draft === 1) || (versions.length === 0 && budgetAllocation);
+
+                        return (
+                          <TableRow key={idx}>
+                            <TableCell>
+                              {isEditable && editingCell.idx === idx && editingCell.field === "expense_type" ? (
+                                <GlobalSelect
+                                  options={expenseTypeOptions}
+                                  value={expenseTypeOptions.find(opt => opt.label === exp.expense_type) || null}
+                                  onChange={option => handleExpenseChange(idx, "expense_type", option)}
+                                  onBlur={() => handleExpenseBlur(idx, "expense_type")}
+                                  autoFocus
+                                  menuPortalTarget={document.body}
+                                />
+                              ) : (
+                                <div
+                                  className={cn("text-sm cursor-pointer", isEditable && "hover:underline")}
+                                  onClick={isEditable ? () => setEditingCell({ idx, field: "expense_type" }) : undefined}
+                                >
+                                  {exp.expense_type || <span className="text-muted-foreground italic">Select Type</span>}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {isEditable && editingCell.idx === idx && editingCell.field === "budget_allocated" ? (
+                                <input
+                                  type="number" min="0" step="0.01" autoFocus
+                                  className="w-24 px-2 py-1 text-right border rounded text-sm"
+                                  value={exp.budget_allocated}
+                                  onChange={e => handleExpenseChange(idx, "budget_allocated", e.target.value)}
+                                  onBlur={() => handleExpenseBlur(idx, "budget_allocated")}
+                                  onKeyDown={e => { if (e.key === "Enter") handleExpenseBlur(idx, "budget_allocated"); }}
+                                />
+                              ) : (
+                                <div
+                                  className={cn("text-sm font-medium cursor-pointer", isEditable && "hover:underline")}
+                                  onClick={isEditable ? () => setEditingCell({ idx, field: "budget_allocated" }) : undefined}
+                                >
+                                  ₱{Number(exp.budget_allocated ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {isEditable && (
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteExpense(idx)} disabled={deletingIdx === idx}>
+                                  {deletingIdx === idx ? <Loader2 className="h-3 w-3 animate-spin" /> : <SquareX size={14} />}
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+              <div className="p-4 border-t bg-muted/20 flex justify-between font-bold text-sm">
+                <span>Total</span>
+                <span>₱{sumOtherExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              </div>
+            </Card>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center p-12 text-muted-foreground border-2 border-dashed rounded-lg bg-muted/10">
+            <Info className="h-10 w-10 mb-2 opacity-20" />
+            <p>No budget allocation data found for this project.</p>
+          </div>
+        )}
+      </div>
+
       {showConfirmModal && (
         <ProjectBudgetConfirmModal
           isVisible={showConfirmModal}
@@ -1042,8 +830,10 @@ const ProjectBudget = () => {
           projectCode={projectCodeOptions.find(opt => opt.value === selectedProjectId)?.label || ""}
         />
       )}
-    </div>
+    </PageContainer>
   );
 };
 
 export default ProjectBudget;
+
+

@@ -1,37 +1,45 @@
 import React from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 const ProjectsInternalDeleteModal = ({ isVisible, setModalVisible, handleDelete, projectId }) => {
-  if (!isVisible) return null;
-
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-40">
-      <div className="bg-white z-50 p-6 space-y-4 rounded-lg shadow-lg w-full max-w-md border border-solid border-gray-200">
-        <h3 className="text-lg font-semibold mb-4 text-center">Delete Project</h3>
-        <p className="text-center text-sm mb-6">
-          Are you sure you want to delete this project? This action cannot be undone.
-        </p>
-
-        <div className="flex justify-center gap-4">
-          <button
+    <Dialog open={isVisible} onOpenChange={setModalVisible}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Delete Project</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to delete this project? This action cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="sm:justify-end gap-2">
+          <Button
             type="button"
-            className="text-sm px-6 py-3 bg-gray-300 text-gray-700 rounded-full hover:bg-gray-400 focus:ring-primary"
+            variant="outline"
             onClick={() => setModalVisible(false)}
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="text-sm px-6 py-3 bg-red-500 text-white rounded-full hover:bg-red-600 focus:ring-primary"
+            variant="destructive"
             onClick={() => {
               handleDelete(projectId);
               setModalVisible(false);
             }}
           >
             Delete
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 

@@ -1,82 +1,155 @@
-@import "./tailwind.css";
+@import "tailwindcss";
 
-*:focus {
-  outline: none !important;
-  border: 0px !important;
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  /* Exact Tokens from Reference Repo app.css */
+  --background: #f6f6f7;
+  --foreground: #26292f;
+
+  --card: #ffffff;
+  --card-foreground: #26292f;
+
+  --popover: #ffffff;
+  --popover-foreground: #26292f;
+
+  --primary: #26292f;
+  --primary-foreground: #f6f6f7;
+
+  --secondary: #e8e8e9;
+  --secondary-foreground: #26292f;
+
+  --muted: #d7d9dd;
+  --muted-foreground: #4a4f58;
+
+  --accent: #e8e8e9;
+  --accent-foreground: #26292f;
+
+  --destructive: #e25141;
+  --destructive-foreground: #fff7f6;
+
+  --border: #d0d2d6;
+  --input: #d0d2d6;
+  --ring: #2c85af;
+
+  /* Charts (Approximated from repo chart vars) */
+  --chart-1: #2c85af;
+  --chart-2: #4f9fc4;
+  --chart-3: #79b6d5;
+  --chart-4: #a3cada;
+  --chart-5: #ccdfea;
+
+  --radius: 0.625rem;
+  /* 10px from repo */
+
+  --sidebar-background: #f6f6f7;
+  /* Matching background per repo */
+  --sidebar-foreground: #26292f;
+  --sidebar-primary: #26292f;
+  --sidebar-primary-foreground: #f6f6f7;
+  --sidebar-accent: #e8e8e9;
+  --sidebar-accent-foreground: #26292f;
+  --sidebar-border: #d0d2d6;
+  --sidebar-ring: #3a9fcb;
 }
 
+.dark {
+  --background: #26292f;
+  --foreground: #f6f6f7;
+  --card: #2f333a;
+  --card-foreground: #f6f6f7;
+  --popover: #2f333a;
+  --popover-foreground: #f6f6f7;
+  --primary: #3a9fcb;
+  --primary-foreground: #0e1720;
+  --secondary: #30343b;
+  --secondary-foreground: #f6f6f7;
+  --muted: #30343b;
+  --muted-foreground: #bfc3ca;
+  --accent: #30343b;
+  --accent-foreground: #f6f6f7;
+  --destructive: #f06a5a;
+  --destructive-foreground: #2f333a;
+  --border: #3a3f46;
+  --input: #3a3f46;
+  --ring: #3a9fcb;
+  --chart-1: #3a9fcb;
+  --chart-2: #62b3d6;
+  --chart-3: #89c7e1;
+  --chart-4: #afdaeb;
+  --chart-5: #d5ecf5;
+  --sidebar-background: #26292f;
+  --sidebar-foreground: #f6f6f7;
+  --sidebar-primary: #2c85af;
+  --sidebar-primary-foreground: #f6f6f7;
+  --sidebar-accent: #30343b;
+  --sidebar-accent-foreground: #f6f6f7;
+  --sidebar-border: #3a3f46;
+  --sidebar-ring: #3a9fcb;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar-background);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Scrollbar Polish */
 .sidebar-scroll::-webkit-scrollbar {
-  width: 8px;
-  /* Scroll width */
-}
-
-.sidebar-scroll::-webkit-scrollbar-track {
-  background: #111;
-  /* Match neutral-900 */
-}
-
-.sidebar-scroll::-webkit-scrollbar-thumb {
-  background: #3a3a3a;
-  /* Match neutral-700 */
-  border-radius: 12px;
-}
-
-.sidebar-scroll::-webkit-scrollbar-thumb:hover {
-  background: #525252;
-  /* Brighter on hover */
-}
-
-/* Firefox support */
-.sidebar-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: #3a3a3a #111;
+  width: 0px;
+  background: transparent;
 }
 
 /* highlight background only in the day grid */
 .rbc-day-slot .highlight-slot {
   background-color: #ebf3fa !important;
   border-top: none !important;
-  /* remove slot dividers */
 }
-
-/* .rbc-now div span{
-  background-color: #000;
-  color: #fff;
-  border-radius: 100%;
-} */
-
-.event-with-handles .custom-resize-handle {
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background-color: rgba(255, 255, 255, 0.9);
-  border: 2px solid rgba(0, 0, 0, 0.3);
-  cursor: ns-resize;
-  z-index: 10;
-  opacity: 1 !important;
-  visibility: visible !important;
-}
-
-/* Top handle - positioned near left */
-.event-with-handles .top-handle {
-  top: -6px;
-  left: 8px;
-}
-
-/* Bottom handle - positioned near right */
-.event-with-handles .bottom-handle {
-  bottom: -6px;
-  right: 8px;
-}
-
-/* Hover effect for better interaction feedback */
-.event-with-handles .custom-resize-handle:hover {
-  background-color: rgba(255, 255, 255, 1);
-  border-color: rgba(0, 0, 0, 0.6);
-  transform: scale(1.2);
-}
-
 
 /* remove highlight from gutter */
 .rbc-time-gutter .highlight-slot {
@@ -85,7 +158,6 @@
 }
 
 .rbc-day-slot .highlight-slot-lunch {
-  /* background-color: rgba(68, 68, 68, 0.2) !important; */
   background-color: transparent !important;
 }
 
@@ -117,6 +189,8 @@
   padding: 1px 5px !important;
   background-color: transparent !important;
   border: none;
+  overflow: visible !important;
+  /* Allow events to expand on hover */
 }
 
 .rbc-show-more {
@@ -143,10 +217,13 @@
 .rbc-month-row {
   overflow: unset !important;
   display: block !important;
+  height: auto !important;
+  min-height: 80px;
 }
 
 .rbc-month-view {
   border: unset !important;
+  height: auto !important;
 }
 
 .rbc-month-header {
@@ -156,9 +233,21 @@
   z-index: 10;
 }
 
+/* Allow row content to grow with events */
+.rbc-row-content {
+  height: auto !important;
+  overflow: visible !important;
+}
+
+/* The inner row that holds event segments */
+.rbc-row-content .rbc-row {
+  height: auto !important;
+}
+
 .rbc-row-segment {
   display: block !important;
   margin-bottom: 2px;
+  padding: 0 2px;
 }
 
 .rbc-event-stack {
@@ -172,14 +261,98 @@
   background: transparent !important;
 }
 
-
-/* ETF TABLE STYLES */
-.stage-col {
-  /* min-width: 100px; */
-  max-width: 100px;
+/* Fix for calendar column alignment */
+.rbc-time-view {
+  flex: 1;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0;
+  width: 100%;
 }
 
-/* .no-padding-cells th,
-.no-padding-cells td {
-  padding: 0;
-} */
+/* Force header to have margin compensating for scrollbar */
+.rbc-time-header {
+  flex: 0 0 auto !important;
+  /* 
+     Match the scrollbar width of the content area.
+     We force scrollbar width to 14px in ::-webkit-scrollbar below.
+  */
+  margin-right: 14px !important;
+  width: auto !important;
+  /* Allow flex shrinking if needed */
+}
+
+/* Ensure content always shows scrollbar to maintain vertical alignment */
+.rbc-time-content {
+  flex: 1 !important;
+  overflow-y: scroll !important;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* RBC adds this class sometimes, but we are handling it manually above to be safe and consistent */
+.rbc-time-header.rbc-overflowing {
+  margin-right: 14px !important;
+}
+
+/* Force scrollbar width so our 14px margin valid across browsers */
+.rbc-time-content::-webkit-scrollbar {
+  width: 14px;
+  /* Added to prevent horizontal scrollbar */
+  height: 0px;
+}
+
+.rbc-time-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.rbc-time-content::-webkit-scrollbar-thumb {
+  background-color: #d1d5db;
+  /* gray-300 */
+  border-radius: 7px;
+  border: 4px solid transparent;
+  background-clip: content-box;
+}
+
+.rbc-time-content::-webkit-scrollbar-thumb:hover {
+  background-color: #9ca3af;
+  /* gray-400 */
+}
+
+/* Force header gutter to match if we force scroll in content */
+/* Note: RBC creates a dummy cell for gutter, but we need ensuring the header container itself doesn't shrink awkwardly or misalign */
+.rbc-time-header-content {
+  border-right: 1px solid #e5e7eb;
+  margin-right: -1px;
+  /* Tweak to handle the border accumulation */
+}
+
+/* Ensure grid lines align */
+.rbc-day-slot .rbc-time-column {
+  border-right: 1px solid #e5e7eb;
+}
+
+.rbc-time-header-content .rbc-time-header-cell-single-day {
+  border-right: 1px solid #e5e7eb;
+}
+
+/* Spark Burst Animation */
+@keyframes spark-burst {
+  0% {
+    box-shadow: 0 0 0 0 rgba(113, 113, 122, 0.4);
+    transform: scale(1);
+  }
+
+  70% {
+    box-shadow: 0 0 0 10px rgba(113, 113, 122, 0);
+    transform: scale(1.02);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(113, 113, 122, 0);
+    transform: scale(1);
+  }
+}
+
+.animate-spark-burst {
+  animation: spark-burst 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

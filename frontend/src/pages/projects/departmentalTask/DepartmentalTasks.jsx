@@ -1,244 +1,175 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useAppData } from "../../../context/AppDataContext";
-import { api } from "../../../api/api";
-import DepartmentalTasksTable from "./components/DepartmentalTasksTable";
-import DepartmentalTasksModal from "./components/DepartmentalTasksModal";
-import Pagination from "../../../components/navigations/Pagination";
-import Search from "../../../components/navigations/Search";
+import PageContainer from "@/components/ui/PageContainer";
+import { DataTable } from "@/components/ui/data-table";
+import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import DepartmentalTasksDeleteModal from "./components/DepartmentalTasksDeleteModal";
-import { errorNotification, successNotification, pendingNotification } from '../../../components/notifications/notifications';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/use-toast";
+import { api } from "../../../api/api";
 
-const TASKS_PER_PAGE = 25;
+// Helper to get subsidiary name
+const getSubsidiaryName = (department_id, departments, subsidiaries) => {
+  const department = departments?.find((d) => d.id === department_id);
+  if (!department) return "Unknown";
+  const subsidiary = subsidiaries?.find((s) => s.id === department.subsidiary_id);
+  return subsidiary?.name || "Unknown";
+};
+
+export const columns = (departments, subsidiaries, handleDelete, handleEdit) => [
+  {
+    accessorKey: "task_name",
+    header: "Task Name",
+  },
+  {
+    accessorKey: "department_id",
+    header: "Subsidiary",
+    cell: ({ row }) => {
+      const deptId = row.getValue("department_id");
+      return getSubsidiaryName(deptId, departments, subsidiaries);
+    }
+  },
+  {
+    id: "actions",
+    cell: ({ row }) => {
+      const task = row.original;
+      return (
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => handleEdit(task)} className="h-8 w-8">
+            <span className="sr-only">Edit</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => handleDelete(task.id)} className="h-8 w-8 text-destructive hover:text-destructive">
+            <span className="sr-only">Delete</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-trash-2"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>
+          </Button>
+        </div>
+      );
+    }
+  }
+];
 
 const DepartmentalTasks = () => {
   const {
-    departmentalTasks,
-    setDepartmentalTasks,
+    departmentalTasks, // This is { tasks: [...] } based on previous file
+    fetchDepartmentalTasks,
     departments,
     subsidiaries,
     headerReq,
     auth_user
   } = useAppData();
 
-  const [modalVisible, setModalVisible] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
+
+  // Form State
   const [editingTask, setEditingTask] = useState(null);
-  const [formState, setFormState] = useState({
-    task_name: "",
-    department_id: "",
-  });
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false); 
-  const [taskIdToDelete, setTaskIdToDelete] = useState(null);
-
-  const [search, setSearch] = useState("");
-  const [sortConfig, setSortConfig] = useState({ key: "", direction: "asc" });
-  const [page, setPage] = useState(1);
-
-  const getSubsidiaryName = (department_id) => {
-    const department = departments?.find((d) => d.id === department_id);
-    if (!department) return "Unknown";
-    const subsidiary = subsidiaries?.find((s) => s.id === department.subsidiary_id);
-    return subsidiary?.name || "Unknown";
-  };
-
-  const filteredTasks = useMemo(() => {
-    let filtered = Array.isArray(departmentalTasks.tasks)
-      ? departmentalTasks.tasks.filter(
-          (t) =>
-            t.task_name.toLowerCase().includes(search.toLowerCase()) ||
-            getSubsidiaryName(t.department_id).toLowerCase().includes(search.toLowerCase()) ||
-            String(t.id).includes(search)
-        )
-      : [];
-    if (sortConfig.key) {
-      filtered = [...filtered].sort((a, b) => {
-        let aValue, bValue;
-        if (sortConfig.key === "department_id") {
-          aValue = getSubsidiaryName(a.department_id);
-          bValue = getSubsidiaryName(b.department_id);
-        } else {
-          aValue = a[sortConfig.key];
-          bValue = b[sortConfig.key];
-        }
-        if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
-        if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
-        return 0;
-      });
-    }
-    return filtered;
-  }, [departmentalTasks, search, sortConfig, departments, subsidiaries]);
-
-  const totalPages = Math.ceil(filteredTasks.length / TASKS_PER_PAGE);
-  const paginatedTasks = useMemo(() => {
-    const start = (page - 1) * TASKS_PER_PAGE;
-    return filteredTasks.slice(start, start + TASKS_PER_PAGE);
-  }, [filteredTasks, page]);
-
-  const handleAdd = () => {
-    setEditingTask(null);
-    setFormState({
-      task_name: "",
-      department_id: "",
-    });
-    setModalVisible(true);
-  };
-
-  const handleEdit = (record) => {
-    setEditingTask(record);
-    setFormState({
-      task_name: record.task_name,
-      department_id: record.department_id,
-    });
-    setModalVisible(true);
-  };
-
-  const handleDelete = async (id) => {
-    api("departmental_task_delete", { ...headerReq, id })
-      .then(() => {
-        setDepartmentalTasks((prev) => ({
-          ...prev,
-          tasks: Array.isArray(prev.tasks) ? prev.tasks.filter((t) => t.id !== id) : [],
-        }));
-        // successNotification({ title: "Task deleted", message: "The task was successfully deleted." });
-      })
-      .catch(() => {
-        errorNotification({ title: "Task deletion failed", message: "Failed to delete task" });
-      });
-  };
-
-  const handleModalOk = async (e) => {
-    e.preventDefault();
-    if (!formState.task_name || !formState.department_id) {
-      return;
-    }
-    try {
-      const apiPayload = {
-        ...formState,
-        department_id: parseInt(formState.department_id, 10),
-      };
-
-      if (editingTask) {
-        api("departmental_task_update", { ...headerReq, id: editingTask.id }, apiPayload)
-          .then(() => {
-            setDepartmentalTasks((prev) => ({
-              ...prev,
-              tasks: Array.isArray(prev.tasks)
-                ? prev.tasks.map((t) =>
-                    t.id === editingTask.id ? { ...t, ...apiPayload } : t
-                  )
-                : [],
-            }));
-            // successNotification({ title: "Task updated", message: "The task was successfully updated." });
-          })
-          .catch(() => {
-            errorNotification({ title: "Task update failed", message: "Failed to update task" });
-          });
-      } else {
-        api("departmental_task_create", headerReq, apiPayload)
-          .then((res) => {
-            setDepartmentalTasks((prev) => ({
-              ...prev,
-              tasks: Array.isArray(prev.tasks) ? [...prev.tasks, res] : [res],
-            }));
-            // successNotification({ title: "Task added", message: "The task was successfully added." });
-          })
-          .catch(() => {
-            errorNotification({ title: "Task addition failed", message: "Failed to add task" });
-          });
-      }
-      setModalVisible(false);
-    } catch {
-      errorNotification({ title: "Task saving failed", message: "Failed to save task" });
-    }
-  };
-
-  const handleSearchChange = (e) => {
-    setSearch(e.target.value);
-    setPage(1);
-  };
+  const [taskName, setTaskName] = useState("");
+  const [deptId, setDeptId] = useState("");
 
   useEffect(() => {
-    document.title = "Departmental Tasks | Aidea Time Charging";
-  }, [search, sortConfig]);
+    const loadData = async () => {
+      setLoading(true);
+      await fetchDepartmentalTasks();
+      setLoading(false);
+    }
+    loadData();
+  }, []);
+
+  // Columns with Context
+  const tableColumns = React.useMemo(() => columns(
+    departments,
+    subsidiaries,
+    (id) => setDeleteId(id), // Handle Delete Trigger
+    (task) => { // Handle Edit Trigger
+      setEditingTask(task);
+      setTaskName(task.task_name);
+      setDeptId(task.department_id);
+      setIsModalOpen(true);
+    }
+  ), [departments, subsidiaries]);
+
+  // Handle Save
+  const handleSave = async () => {
+    if (!taskName || !deptId) return;
+
+    const payload = {
+      task_name: taskName,
+      department_id: parseInt(deptId)
+    };
+
+    if (editingTask) {
+      await api("departmental_task_update", { ...headerReq, id: editingTask.id }, payload);
+    } else {
+      await api("departmental_task_create", headerReq, payload);
+    }
+
+    await fetchDepartmentalTasks();
+    setIsModalOpen(false);
+    setEditingTask(null);
+    setTaskName("");
+    setDeptId("");
+  };
+
+  // Handle Delete Confirm
+  const confirmDelete = async () => {
+    if (deleteId) {
+      await api("departmental_task_delete", { ...headerReq, id: deleteId });
+      await fetchDepartmentalTasks();
+      setDeleteId(null);
+    }
+  };
+
+  const tasks = departmentalTasks?.tasks || [];
+
+  const resetForm = () => {
+    setEditingTask(null);
+    setTaskName("");
+    setDeptId("");
+  };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      <div className="container-fluid h-full">
-        {modalVisible && (
-          <DepartmentalTasksModal
-            formState={formState}
-            setFormState={setFormState}
-            handleModalOk={handleModalOk}
-            setModalVisible={setModalVisible}
-            editingTask={editingTask}
-            departments={departments}
-          />
-        )}
-
-        {/* Render the Delete Modal */}
-        {deleteModalVisible && (
-          <DepartmentalTasksDeleteModal
-            taskId={taskIdToDelete}
-            setModalVisible={setDeleteModalVisible}
-            handleDelete={handleDelete}
-          />
-        )}
-
-        <div className="w-full sticky top-0 bg-white flex justify-between items-center border-b p-3 z-10">
-          <h1 className="text-xl font-semibold text-gray-700">Departmental Tasks</h1>
-          
-          <div className="flex gap-3">
-            <Search
-              value={search}
-              onChange={handleSearchChange}
-              placeholder="Search task"
-            />
-            {auth_user?.role_id === 3 && (
-              <div
-                className="flex items-center bg-gray-100 hover:bg-gray-200 rounded-full transition-all duration-300 shadow-sm cursor-pointer min-h-[40px] px-3"
-                onClick={handleAdd}
-                style={{ minHeight: 40 }}
-              >
-                <span className="flex items-center justify-center text-gray-500">
-                  <Plus size={20} />
-                </span>
+    <PageContainer>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Departmental Tasks</h2>
+          <p className="text-muted-foreground">Manage standard tasks for departments.</p>
+        </div>
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogTrigger asChild>
+            <Button><Plus className="mr-2 h-4 w-4" /> Add Task</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Departmental Task</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Task Name</Label>
+                <Input value={taskName} onChange={e => setTaskName(e.target.value)} />
               </div>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-12 h-[calc(100vh-8rem)] overflow-y-auto">
-          <div className="col-span-12 overflow-auto h-full flex flex-col pb-16 sm:pb-0">
-            <DepartmentalTasksTable
-              departmentalTasks={paginatedTasks}
-              getSubsidiaryName={getSubsidiaryName}
-              handleEdit={handleEdit}
-              handleDelete={(id) => {
-                setTaskIdToDelete(id); // Set the task ID to be deleted
-                setDeleteModalVisible(true); // Show the delete confirmation modal
-              }}
-              setConfirmDeleteId={setConfirmDeleteId}
-              confirmDeleteId={confirmDeleteId}
-              departments={departments}
-              auth_user={auth_user}
-            />
-          </div>
-        </div>
-
-        <div
-          className="w-full sticky bottom-0 bg-white flex justify-center items-center border-t p-3 pb-20 sm:pb-3 z-10"
-        >
-          <Pagination
-            currentPage={page}
-            lastPage={totalPages}
-            totalPages={totalPages}
-            totalRecords={filteredTasks.length}
-            onPageChange={setPage}
-          /> 
-        </div>
+              <Button onClick={handleSave} className="w-full">Save Task</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
-    </div>
+
+      <DataTable
+        columns={tableColumns}
+        data={tasks}
+        searchKey="task_name"
+        loading={loading}
+      />
+    </PageContainer>
   );
 };
 

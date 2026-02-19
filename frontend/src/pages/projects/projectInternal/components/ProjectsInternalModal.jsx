@@ -1,4 +1,22 @@
-import React from "react";
+import React, { useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const ProjectsInternalModal = ({
   editingProject,
@@ -9,85 +27,108 @@ const ProjectsInternalModal = ({
   setModalVisible,
   subsidiaries,
 }) => {
+  // Reset form when modal opens
+  useEffect(() => {
+    if (!editingProject) {
+      // Optional: reset form if needed logic here, mostly handled by parent
+    }
+  }, [editingProject]);
+
+  const handleSelectChange = (name, value) => {
+    setFormState((prev) => ({ ...prev, [name]: value }));
+  };
+
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-40">
-      <div className="bg-white z-50 p-6 space-y-4 rounded-lg shadow-lg w-full max-w-md border border-solid border-gray-200">
-        <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">
-          <span>{editingProject ? "Edit Project" : "Add Project"}</span>
-        </h3>
-        <form onSubmit={handleModalOk} className="space-y-4">
-          <div>
-            <label className="block mb-1 font-medium">Project Code</label>
-            <input
-              className="w-full p-2 border rounded-lg text-sm focus:ring-primary focus:outline-blue-500 outline outline-2 outline-transparent"
+    <Dialog open={true} onOpenChange={setModalVisible}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>{editingProject ? "Edit Project" : "Add Project"}</DialogTitle>
+          <DialogDescription>
+            Make changes to the project details here. Click save when you're done.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleModalOk} className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="project_code" className="text-right">
+              Code
+            </Label>
+            <Input
+              id="project_code"
               name="project_code"
               value={formState.project_code}
               onChange={handleInputChange}
+              className="col-span-3"
               required
-              placeholder="Enter project code"
             />
           </div>
-          <div>
-            <label className="block mb-1 font-medium">Project Name</label>
-            <input
-              className="w-full p-2 border rounded-lg text-sm focus:ring-primary focus:outline-blue-500 outline outline-2 outline-transparent"
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="project_name" className="text-right">
+              Name
+            </Label>
+            <Input
+              id="project_name"
               name="project_name"
               value={formState.project_name}
               onChange={handleInputChange}
+              className="col-span-3"
               required
-              placeholder="Enter project name"
             />
           </div>
-          <div>
-            <label className="block mb-1 font-medium">Subsidiary</label>
-            <select
-              className="w-full p-2 border rounded-lg text-sm focus:ring-primary focus:outline-blue-500 outline outline-2 outline-transparent"
-              name="subsidiary_id"
-              value={formState.subsidiary_id}
-              onChange={handleInputChange}
-              required
-            >
-              <option value="" disabled>Select subsidiary</option>
-              {subsidiaries?.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="subsidiary_id" className="text-right">
+              Subsidiary
+            </Label>
+            <div className="col-span-3">
+              <Select
+                value={formState.subsidiary_id ? String(formState.subsidiary_id) : ""}
+                onValueChange={(val) => handleSelectChange("subsidiary_id", val)}
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select subsidiary" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subsidiaries?.map((s) => (
+                    <SelectItem key={s.id} value={String(s.id)}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div>
-            <label className="block mb-1 font-medium">Status</label>
-            <select
-              className="w-full p-2 border rounded-lg text-sm focus:ring-primary focus:outline-blue-500 outline outline-2 outline-transparent"
-              name="project_status"
-              value={formState.project_status}
-              onChange={handleInputChange}
-              required
-            >
-              <option value="" disabled>Select status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="other">Other</option>
-            </select>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="project_status" className="text-right">
+              Status
+            </Label>
+            <div className="col-span-3">
+              <Select
+                value={formState.project_status}
+                onValueChange={(val) => handleSelectChange("project_status", val)}
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
+                  <SelectItem value="Closed">Closed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className="flex justify-end gap-2 mt-4">
-            <button
-              type="button"
-              className="text-sm px-6 py-3 bg-gray-300 text-gray-700 rounded-full hover:bg-gray-400 focus:ring-primary"
-              onClick={() => setModalVisible(false)}
-            >
+          <DialogFooter>
+            <Button type="button" variant="secondary" onClick={() => setModalVisible(false)}>
               Cancel
-            </button>
-            <button
-              type="submit"
-              className="text-sm px-6 py-3 bg-primary text-white rounded-full hover:bg-primary-hover focus:ring-primary"
-            >
-              {editingProject ? "Save" : "Add"}
-            </button>
-          </div>
+            </Button>
+            <Button type="submit">
+              {editingProject ? "Save changes" : "Create project"}
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 

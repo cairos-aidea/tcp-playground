@@ -11,8 +11,26 @@ import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
 import EventCustomizer from "./EventCustomizer";
 import { useAppData } from "../../../context/AppDataContext";
-import { Sheet, FileUser, CircleX, CircleAlert, SendHorizontal, X, Menu, CalendarDays, Clock, UserCheck, CheckCircle2, XCircle, Hourglass, ClipboardList, ArrowLeft, ArrowRight, UserRoundPenIcon, Timer, TimerIcon, CalendarClock, CalendarFold, CalendarFoldIcon } from "lucide-react";
+import { Sheet, FileUser, CircleX, CircleAlert, SendHorizontal, X, Menu, CalendarDays, Clock, UserCheck, CheckCircle2, XCircle, Hourglass, ClipboardList, ArrowLeft, ArrowRight, UserRoundPenIcon, Timer, TimerIcon, CalendarClock, CalendarFold, CalendarFoldIcon, ChevronLeft, ChevronRight, Sparkles, RefreshCw } from "lucide-react";
 import GlobalSelect from "../../../components/layouts/GlobalSelect";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import { DateTimePicker } from "@/components/ui/DateTimePicker";
+import SaveSparkleEffect from "@/components/ui/SaveSparkleEffect";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 const DragAndDropCalendar = withDragAndDrop(DnDCalendar);
 
@@ -53,7 +71,8 @@ const CalendarModal = ({
 }) => {
   const {
     staffs,
-    activities
+    activities,
+    holidaysCalendar
   } = useAppData();
 
   useEffect(() => {
@@ -63,6 +82,19 @@ const CalendarModal = ({
   }, [timeFields.option, timeChargeOption]);
 
   const [timeWarnings, setTimeWarnings] = useState([]);
+  const [isSaved, setIsSaved] = useState(modalStatus === "edit");
+  const [isDirty, setIsDirty] = useState(modalStatus === "create");
+
+  // Reset saved state when modal opens or switches to a new entry
+  useEffect(() => {
+    const isEdit = modalStatus === "edit";
+    setIsSaved(isEdit);
+    setIsDirty(!isEdit);
+    formChangeCounter.current = 0;
+    savedAtCounter.current = 0;
+    isInitialMount.current = true;
+  }, [show, timeFields.id, modalStatus]);
+
 
   const [calendarDate, setCalendarDate] = useState(
     timeFields?.start_time ? new Date(timeFields.start_time) : new Date()
@@ -180,8 +212,8 @@ const CalendarModal = ({
                 toggleStudio(studio.id);
               }}
               className={`px-2 py-1 rounded-full text-xs border ${selectedStudios.includes(studio.id)
-                  ? "bg-primary text-white"
-                  : "bg-white hover:bg-gray-100"
+                ? "bg-primary text-white"
+                : "bg-white hover:bg-gray-100"
                 }`}
             >
               {studio.name}
@@ -198,7 +230,7 @@ const CalendarModal = ({
     <components.LoadingIndicator {...props}>
       <ReactLoading
         type="bars"
-        color="#333"     
+        color="#333"
         height={22}
         width={22}
       />
@@ -255,10 +287,50 @@ const CalendarModal = ({
     );
   };
 
-  // Update calendarDate if timeFields.start_time changes
+  // Update calendarDate when start_time changes
   useEffect(() => {
-    setCalendarDate(new Date());
-  }, []);
+    if (timeFields.start_time) {
+      setCalendarDate(new Date(timeFields.start_time));
+    }
+  }, [timeFields.start_time]);
+
+  // Track dirty state — any form field change after initial load marks as dirty
+  const formChangeCounter = React.useRef(0);
+  const savedAtCounter = React.useRef(0);
+  const isInitialMount = React.useRef(true);
+
+  useEffect(() => {
+    // Skip the very first render to avoid marking edit mode as dirty
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    formChangeCounter.current += 1;
+    if (formChangeCounter.current > savedAtCounter.current) {
+      setIsSaved(false);
+      setIsDirty(true);
+    }
+  }, [timeFields.start_time, timeFields.end_time, timeFields.is_ot, timeFields.remarks,
+  formExternal.project_id, formExternal.stage_id, formExternal.activity,
+  formInternal.project_id, formDepartmental.departmental_task_id]);
+
+  // Navigate calendar preview to previous day
+  const handlePrevDay = () => {
+    setCalendarDate(prev => {
+      const d = new Date(prev);
+      d.setDate(d.getDate() - 1);
+      return d;
+    });
+  };
+
+  // Navigate calendar preview to next day
+  const handleNextDay = () => {
+    setCalendarDate(prev => {
+      const d = new Date(prev);
+      d.setDate(d.getDate() + 1);
+      return d;
+    });
+  };
 
   // Helper: check overlap
   const checkOverlap = (start, end, excludeId = null) => {
@@ -306,6 +378,27 @@ const CalendarModal = ({
         const excludeId = modalStatus === "edit" ? timeFields.id : null;
         if (checkOverlap(start, end, excludeId)) {
           errors.overlap = "This time overlaps with another entry.";
+        }
+      }
+
+      // 2b. Required field validation based on charge type
+      if (timeChargeOption === "external") {
+        if (!formExternal.project_id) {
+          errors.project = "Please select a project.";
+        }
+        if (formExternal.project_id && !formExternal.stage_id) {
+          errors.stage = "Please select a stage.";
+        }
+        if (!formExternal.activity || !formExternal.activity.trim()) {
+          errors.activity = "Please enter an activity.";
+        }
+      } else if (timeChargeOption === "internal") {
+        if (!formInternal.project_id) {
+          errors.project = "Please select a project.";
+        }
+      } else if (timeChargeOption === "departmental") {
+        if (!formDepartmental.departmental_task_id) {
+          errors.task = "Please select a task.";
         }
       }
 
@@ -449,15 +542,17 @@ const CalendarModal = ({
 
     setInputErrors(errors);
     setTimeWarnings(warnings);
-  }, [timeFields, formLeave, modalType, modalStatus, events]);
+  }, [timeFields, formLeave, formExternal, formInternal, formDepartmental, timeChargeOption, modalType, modalStatus, events]);
   // VALIDATION AND TIME COMPUTATION LOGIC
   const selectedDate = timeFields?.start_time
     ? moment(timeFields.start_time).format("YYYY-MM-DD")
     : moment().format("YYYY-MM-DD");
 
+  const previewDate = moment(calendarDate).format("YYYY-MM-DD");
+
   const dailyEvents = useMemo(() => {
-    return (events || []).filter(ev => moment(ev.start).format("YYYY-MM-DD") === selectedDate);
-  }, [events, selectedDate]);
+    return (events || []).filter(ev => moment(ev.start).format("YYYY-MM-DD") === previewDate);
+  }, [events, previewDate]);
 
 
   if (!show) return null;
@@ -720,46 +815,79 @@ const CalendarModal = ({
     return { duration, regular, ot };
   };
 
+  // Overlap/Disabled Dates Logic
+  const isDayDisabled = (date) => {
+    if (!holidaysCalendar) return false;
+    const mmdd = moment(date).format("MM-DD");
+    const yyyymmdd = moment(date).format("YYYY-MM-DD");
+    const isFixed = holidaysCalendar.fixedHolidays?.some(h => h.date === mmdd);
+    const isDynamic = holidaysCalendar.dynamicHolidays?.some(h => h.date === yyyymmdd);
+    return isFixed || isDynamic;
+  };
+
+  const handleDateChange = (field, date) => {
+    if (!date) {
+      setTimeFields(tf => ({ ...tf, [field]: "" }));
+      return;
+    }
+    const dateStr = moment(date).format("YYYY-MM-DDTHH:mm");
+
+    if (field === "start_time") {
+      setTimeFields(tf => {
+        const updated = { ...tf, [field]: dateStr };
+        // If end_time exists and is now before or equal to the new start, clear it
+        if (tf.end_time && moment(tf.end_time).isSameOrBefore(moment(dateStr))) {
+          updated.end_time = "";
+        }
+        return updated;
+      });
+    } else if (field === "end_time") {
+      // If start_time exists, ensure end is after start
+      if (timeFields.start_time && moment(dateStr).isSameOrBefore(moment(timeFields.start_time))) {
+        return; // Silently reject — the picker should already prevent this via minDate
+      }
+      setTimeFields(tf => ({ ...tf, [field]: dateStr }));
+    } else {
+      setTimeFields(tf => ({ ...tf, [field]: dateStr }));
+    }
+  };
+
   // Minimal time charge form with 2-column layout
   const renderTimeChargeForm = () => {
     const disableAll = isFinalStatus(formExternal.status || formInternal.status || formDepartmental.status);
-    // Place this BEFORE the return
     const date = timeFields.start_time
       ? moment(timeFields.start_time).format("YYYY-MM-DD")
       : moment().format("YYYY-MM-DD");
 
     const totals = {};
     (events || []).forEach(ev => {
-      if (ev.type !== "timeCharge" || String(ev.status || "").toLowerCase() === "declined") return;
+      /* Logic for totals from existing code */
+      if (ev.status && ev.status.toLowerCase() === "declined") return;
+      const d = moment(ev.start).format("YYYY-MM-DD");
+      if (!totals[d]) totals[d] = { regular: 0, ot: 0 };
 
       const start = moment(ev.start);
       const end = moment(ev.end);
-      const key = start.format("YYYY-MM-DD");
 
-      if (!totals[key]) totals[key] = { regular: 0, ot: 0 };
-
-      const duration = getDurationMinutes(start, end) / 60;
-
+      // If manually marked as OT
       if (ev.is_ot) {
-        totals[key].ot += duration;
+        const dur = getDurationMinutes(start, end) / 60;
+        totals[d].ot += dur;
         return;
       }
 
-      const workStart = start.clone().set({ hour: 7, minute: 0 });
-      const workEnd = start.clone().set({ hour: 19, minute: 0 });
-
+      // Default logic
+      const workStart = start.clone().set({ hour: 7, minute: 0, second: 0 });
+      const workEnd = start.clone().set({ hour: 19, minute: 0, second: 0 });
       const clampedStart = moment.max(start, workStart);
       const clampedEnd = moment.min(end, workEnd);
 
-      const regular = clampedEnd.isAfter(clampedStart)
-        ? getDurationMinutes(clampedStart, clampedEnd) / 60
-        : 0;
-
-      totals[key].regular += regular;
+      if (clampedEnd.isAfter(clampedStart)) {
+        totals[d].regular += getDurationMinutes(clampedStart, clampedEnd) / 60;
+      }
     });
 
     const { regular = 0, ot = 0 } = totals[date] || {};
-    // const regHours = Math.min(regular, 8);
     const regHours = regular;
     const otHours = ot;
 
@@ -767,406 +895,465 @@ const CalendarModal = ({
     const leaveEvents = (events || []).filter(ev =>
       ev.leave_code && moment(ev.start).format("YYYY-MM-DD") === date
     );
-
     const leaveHours = leaveEvents.reduce((sum, ev) => {
+      /* Logic for leave hours */
       const start = moment(ev.start);
       const end = moment(ev.end);
-      let duration = getDurationMinutes(start, end);
-
-      return sum + Math.max(duration / 60, 0);
+      return sum + (getDurationMinutes(start, end) / 60);
     }, 0);
 
-    const leaveTypesArr = Array.from(
-      new Set(leaveEvents.map(ev => ev.leave_type || ev.leave_code || "Leave"))
-    );
-
-    const status = (formExternal.status || formInternal.status || formDepartmental.status || "").toLowerCase();
-    const eventObj = Array.isArray(events) ? events.find(ev =>
-      (ev.id === timeFields.id || ev.originalId === timeFields.id)
-    ) : undefined;
-    const approver = eventObj && staffs && staffs.find(s => String(s.id) === String(eventObj.approver_id));
-    const approverName = approver ? approver.first_name + " " + approver.last_name : (eventObj ? `ID ${eventObj.approver_id}` : "-");
-    const dateStr = eventObj && eventObj.updated_at ? moment(eventObj.updated_at).format("YYYY-MM-DD HH:mm") : "";
+    const tabs = [
+      { option: "external", label: "External" },
+      { option: "internal", label: "Internal" },
+      { option: "departmental", label: "Dept." }
+    ];
 
     return (
-      <form onSubmit={handleSubmit} className="flex flex-col h-full">
-        <div className="flex flex-col md:flex-row gap-6 flex-1 overflow-y-auto">
-          <div className="flex-1 min-w-0 p-2 flex flex-col">
-            <div className="flex-1 overflow-y-auto mb-2">
-              <div>
-                {renderTimeChargeTabs(disableAll)}
-                {timeFields.option === "external" && formExternal.status !== "approved" && recentExternalInputs.length > 0 && renderRecentActivities()}
-                {timeFields.option === "external" && (
-                  <>
-                    <div className="mb-2 px-1">
-                      <label className="block text-sm mb-1">Project Name*</label>
-                      <GlobalSelect
-                        components={{
-                          MenuList: CustomMenuList,
-                          LoadingIndicator: CustomLoadingIndicator,
+      <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden text-sm">
+        <div className="grid grid-cols-1 md:grid-cols-[580px_1fr] h-full overflow-hidden">
+
+          {/* Left Column: Input Form */}
+          <div className="flex flex-col h-full overflow-y-auto overflow-x-hidden px-6 py-5 border-r border-gray-100 bg-white custom-scrollbar shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] z-10">
+
+            {/* Tabs */}
+            <div className="mb-4 flex-shrink-0">
+              <div className="flex p-0.5 bg-gray-100/80 rounded-lg w-full">
+                {tabs.map(tab => (
+                  <button
+                    key={tab.option}
+                    type="button"
+                    onClick={() => !disableAll && setTimeFields(tf => ({ ...tf, option: tab.option }))}
+                    disabled={disableAll}
+                    className={cn(
+                      "flex-1 py-1.5 text-xs font-medium rounded-md transition-all duration-200 text-center",
+                      timeFields.option === tab.option
+                        ? "bg-white text-primary shadow-sm ring-1 ring-black/5 font-semibold"
+                        : "text-gray-500 hover:text-gray-900 hover:bg-white/40"
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3 flex-1">
+              {/* Recent Inputs */}
+              {timeFields.option === "external" && formExternal.status !== "approved" && recentExternalInputs.length > 0 && (
+                <div className="mb-1">
+                  <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Recent</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {recentExternalInputs.slice(0, 2).map((item, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setFormExternal({
+                            project_id: item.project_id,
+                            project_code: item.project_code,
+                            project_label: item.project_label,
+                            stage_id: item.stage_id,
+                            stage_label: item.stage_label,
+                            activity: item.activity,
+                            status: "pending"
+                          });
                         }}
-                        className="w-full text-sm"
-                        options={filteredProjects ?? []}
-                        // options={externalProjectOptions}
-                        isLoading={isProjectsExternalLoading}
+                        className="bg-gray-50 hover:bg-primary/5 hover:border-primary/20 border border-gray-200 rounded px-2 py-1 text-left max-w-full transition-colors group"
+                      >
+                        <div className="flex items-center gap-1.5 w-full overflow-hidden">
+                          <span className="text-xs font-medium text-gray-700 truncate group-hover:text-primary">{item.project_code}</span>
+                          <span className="text-[10px] text-gray-400 truncate border-l pl-1.5">{item.stage_label}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Fields */}
+              {timeFields.option === "external" && (
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Project</Label>
+                    <GlobalSelect
+                      components={{ MenuList: CustomMenuList, LoadingIndicator: CustomLoadingIndicator }}
+                      className="text-sm"
+                      options={filteredProjects ?? []}
+                      isLoading={isProjectsExternalLoading}
+                      isDisabled={disableAll}
+                      value={externalProjectOptions.find(opt => String(opt.value) === String(formExternal.project_id)) || null}
+                      onChange={opt => setFormExternal(fe => ({ ...fe, project_id: opt?.value ?? "", project_code: opt?.project_code ?? "", project_label: opt?.project_label ?? "" }))}
+                      maxMenuHeight={220}
+                      placeholder="Select Project..."
+                      isClearable
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Stage</Label>
+                      <GlobalSelect
+                        options={externalProjectStages}
                         isDisabled={disableAll}
-                        value={
-                          externalProjectOptions.find(
-                            opt => String(opt.value) === String(formExternal.project_id)
-                          ) || null
-                        }
-                        onChange={opt =>
-                          setFormExternal(fe => ({
-                            ...fe,
-                            project_id: opt ? opt.value : "",
-                            project_code: opt ? opt.project_code : "",
-                            project_label: opt ? opt.project_label : ""
-                          }))
-                        }
-                        maxMenuHeight={275}
-                        placeholder="Select Project"
+                        value={externalProjectStages.find(opt => String(opt.value) === String(formExternal.stage_id)) || null}
+                        onChange={opt => setFormExternal(fe => ({ ...fe, stage_id: opt?.value ?? "", stage_label: opt?.stage_label ?? "" }))}
+                        maxMenuHeight={200}
+                        placeholder="Select Stage"
+                        isClearable
+                        required
+                        className="text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Activity</Label>
+                      <GlobalSelect
+                        className="text-xs"
+                        options={activities.map(a => ({ value: a, label: a }))}
+                        isDisabled={disableAll}
+                        value={formExternal.activity ? { value: formExternal.activity, label: formExternal.activity } : null}
+                        onChange={opt => setFormExternal(fc => ({ ...fc, activity: opt?.value ?? "" }))}
+                        placeholder="Select Activity"
+                        maxMenuHeight={200}
                         isClearable
                         required
                       />
                     </div>
+                  </div>
+                </div>
+              )}
 
-                    <div className="flex px-1 gap-2 mb-2">
-                      <div className="w-1/2">
-                        <label className="block text-sm mb-1">Project Stage*</label>
-                        <GlobalSelect
-                          options={externalProjectStages}
-                          isDisabled={disableAll}
-                          value={externalProjectStages.find(opt => String(opt.value) === String(formExternal.stage_id)) || null}
-                          onChange={opt =>
-                            setFormExternal(fe => ({
-                              ...fe,
-                              stage_id: opt ? opt.value : "",
-                              stage_label: opt ? opt.stage_label : ""
-                            }))
-                          }
-                          maxMenuHeight={200}
-                          placeholder="Select Stage"
-                          isClearable
-                          required
-                        />
-                      </div>
-
-                      <div className="w-1/2">
-                        <label className="block text-sm mb-1">Activity*</label>
-                        <GlobalSelect
-                          className="w-full text-sm"
-                          options={activities.map(a => ({ value: a, label: a }))}
-                          isDisabled={disableAll}
-                          value={formExternal.activity ? { value: formExternal.activity, label: formExternal.activity } : null}
-                          onChange={opt =>
-                            setFormExternal(fc => ({
-                              ...fc,
-                              activity: opt ? opt.value : ""
-                            }))
-                          }
-                          placeholder="Select Activity"
-                          maxMenuHeight={200}
-                          isClearable
-                          required
-                        />
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {timeFields.option === "internal" && (
-                  <div className="mb-2 px-1">
-                    <label className="block text-sm mb-1">Project Name*</label>
+              {timeFields.option === "internal" && (
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Project</Label>
                     <GlobalSelect
-                      components={{
-                        LoadingIndicator: CustomLoadingIndicator,
-                      }}
-                      className="w-full text-sm"
+                      components={{ LoadingIndicator: CustomLoadingIndicator }}
+                      className="text-sm"
                       options={internalProjectOptions}
                       isLoading={isProjectsInternalLoading}
                       isDisabled={disableAll}
                       value={internalProjectOptions.find(opt => String(opt.value) === String(formInternal.project_id)) || null}
-                      onChange={opt =>
-                        setFormInternal(fi => ({
-                          ...fi,
-                          project_id: opt ? opt.value : "",
-                          project_label: opt ? opt.project_label : ""
-                        }))
-                      }
-                      placeholder="Select Project"
+                      onChange={opt => setFormInternal(fi => ({ ...fi, project_id: opt?.value ?? "", project_label: opt?.project_label ?? "" }))}
+                      placeholder="Select Project..."
                       isClearable
                       required
                     />
                   </div>
-                )}
+                </div>
+              )}
 
-                {timeFields.option === "departmental" && (
-                  <div className="mb-2 px-1">
-                    <label className="block text-sm mb-1">Task Name*</label>
+              {timeFields.option === "departmental" && (
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Task</Label>
                     <GlobalSelect
-                      components={{
-                        LoadingIndicator: CustomLoadingIndicator,
-                      }}
-                      className="w-full text-sm"
+                      components={{ LoadingIndicator: CustomLoadingIndicator }}
+                      className="text-sm"
                       options={departmentalTaskOptions}
                       isLoading={isDepartmentalTasksLoading}
                       isDisabled={disableAll}
                       value={departmentalTaskOptions.find(opt => String(opt.value) === String(formDepartmental.departmental_task_id)) || null}
-                      onChange={opt =>
-                        setFormDepartmental(fd => ({
-                          ...fd,
-                          departmental_task_id: opt ? opt.value : "",
-                          activity: opt ? opt.task_name : ""
-                        }))
-                      }
-                      placeholder="Select Task"
+                      onChange={opt => setFormDepartmental(fd => ({ ...fd, departmental_task_id: opt?.value ?? "", activity: opt?.task_name ?? "" }))}
+                      placeholder="Select Task..."
                       isClearable
                       required
                     />
                   </div>
-                )}
-
-                <div className="flex gap-2 px-1 mb-2">
-                  <div className="w-1/2">
-                    <label className="block text-sm mb-1">Start Time*</label>
-                    <input
-                      type="datetime-local"
-                      className={`w-full rounded p-2 text-sm text-gray-700 placeholder:text-gray-400 border border-gray-300 focus:border-gray-400 focus:ring-1 focus:ring-gray-400`}
-                      value={timeFields.start_time}
-                      onChange={e => setTimeFields(tf => ({ ...tf, start_time: e.target.value }))}
-                      disabled={disableAll}
-                    />
-                  </div>
-                  <div className="w-1/2">
-                    <label className="block text-sm mb-1">End Time*</label>
-                    <input
-                      type="datetime-local"
-                      className={`w-full rounded p-2 text-sm text-gray-700 placeholder:text-gray-400 border border-gray-300 focus:border-gray-400 focus:ring-1 focus:ring-gray-400`}
-                      value={timeFields.end_time}
-                      onChange={e => setTimeFields(tf => ({ ...tf, end_time: e.target.value }))}
-                      disabled={disableAll}
-                    />
-                  </div>
                 </div>
+              )}
 
-                <div className="mb-4 px-1 flex items-center gap-4">
-                  <label htmlFor="otDept" className="flex items-center cursor-pointer">
-                    <span className="mr-2 text-sm">Overtime</span>
-                    <input
-                      type="checkbox"
-                      id="otDept"
-                      checked={timeFields.is_ot || ["weekday_holiday", "weekend", "weekend_holiday"].includes(timeFields.ot_type)}
-                      onChange={e => {
-                        if (!timeFields.is_ot && !e.target.checked) return;
-                        setTimeFields(tf => ({
-                          ...tf,
-                          is_ot: e.target.checked,
-                          next_day_ot: e.target.checked ? tf.next_day_ot : false,
-                        }));
-                      }}
-                      className="h-4 w-4 text-primary border-gray-300 focus:ring-primary rounded cursor-pointer"
-                      disabled={disableAll}
-                    />
-                  </label>
-                  {/* {(modalStatus === "view" ? !!timeFields.is_ot : timeFields.is_ot) && (
-                    <label htmlFor="nextDayOtDept" className="flex items-center cursor-pointer">
-                      <span className="mr-2 text-sm">Next Day OT</span>
-                      <input
-                        type="checkbox"
-                        id="nextDayOtDept"
-                        checked={timeFields.next_day_ot}
-                        onChange={e => {
-                          if (!timeFields.is_ot) return;
-                          setTimeFields(tf => ({ ...tf, next_day_ot: e.target.checked }));
-                        }}
-                        className="h-4 w-4 text-primary border-gray-300 focus:ring-primary rounded cursor-pointer"
-                        disabled={disableAll}
-                      />
-                    </label>
-                  )} */}
-                </div>
-
-                <div className="mt-2 pt-2 border-t px-1 border-gray-200">
-                  <label className="block text-sm mb-1">Remarks</label>
-                  <textarea
-                    className={`w-full rounded text-sm text-gray-700 placeholder:text-gray-400 border border-gray-300 focus:border-gray-400 focus:ring-1 focus:ring-gray-400 mb-2`}
-                    rows={2.5}
-                    value={timeFields.remarks}
-                    onChange={e => setTimeFields(tf => ({ ...tf, remarks: e.target.value }))}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Start</Label>
+                  <DateTimePicker
+                    value={timeFields.start_time ? new Date(timeFields.start_time) : undefined}
+                    onChange={(date) => handleDateChange("start_time", date)}
                     disabled={disableAll}
-                    placeholder="What did you work on?"
+                    className="h-9 text-xs font-medium"
+                    placeholder="Select Start Time"
+                    disabledDates={isDayDisabled}
                   />
                 </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">End</Label>
+                  <DateTimePicker
+                    value={timeFields.end_time ? new Date(timeFields.end_time) : undefined}
+                    onChange={(date) => handleDateChange("end_time", date)}
+                    disabled={disableAll}
+                    className="h-9 text-xs font-medium"
+                    placeholder="Select End Time"
+                    disabledDates={isDayDisabled}
+                    minDate={timeFields.start_time ? new Date(timeFields.start_time) : undefined}
+                  />
+                </div>
+              </div>
 
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 py-1">
+                  <input
+                    type="checkbox"
+                    id="otDept"
+                    checked={timeFields.is_ot || ["weekday_holiday", "weekend", "weekend_holiday"].includes(timeFields.ot_type)}
+                    onChange={e => setTimeFields(tf => ({ ...tf, is_ot: e.target.checked }))}
+                    className="h-3.5 w-3.5 text-primary border-gray-300 focus:ring-primary rounded cursor-pointer accent-primary"
+                    disabled={disableAll}
+                  />
+                  <Label htmlFor="otDept" className="text-xs font-medium cursor-pointer select-none text-gray-700">Mark as Overtime</Label>
+                </div>
+              </div>
+
+              <div className="space-y-1 pt-1">
+                <Label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Remarks</Label>
+                <textarea
+                  className={cn(
+                    "flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none",
+                  )}
+                  rows={3}
+                  value={timeFields.remarks}
+                  onChange={e => setTimeFields(tf => ({ ...tf, remarks: e.target.value }))}
+                  disabled={disableAll}
+                  placeholder="Optional details..."
+                />
               </div>
             </div>
 
-            {/* Fixed bottom summary */}
-            <div
-              className={`text-sm leading-tight mt-auto p-2 border-y flex items-center justify-between gap-2 w-full overflow-x-auto whitespace-nowrap
-              ${{
-                  approved: "border-green-200 bg-green-100",
-                  declined: "border-red-200 bg-red-100",
-                  pending: "border-yellow-200 bg-yellow-100",
-                }[
-                (formExternal.status || formInternal.status || formDepartmental.status || "pending").toLowerCase()
-                ]
-                }`}
-            >
-              {/* Left side — This Entry */}
-              <div className="font-semibold text-gray-700 truncate flex items-center gap-1 flex-shrink-0">
-                <TimerIcon className="w-4 h-4 text-gray-500" />
-                <span className="text-gray-500">This Entry:</span>
-                <span>{(getCurrentDuration()?.duration ?? 0).toFixed(2)} hours</span>
-              </div>
-
-              {/* Right side — Status, Errors or Warnings */}
-              <div className="flex items-center gap-2 min-w-0 flex-shrink">
-                {Object.keys(inputErrors).length > 0 ? (
-                  <div className="text-red-500 text-sm flex items-center gap-1 truncate">
-                    <CircleX className="w-4 h-4 flex-shrink-0" />
-                    <span className="truncate">{Object.values(inputErrors)[0]}</span>
-                  </div>
-                ) : timeWarnings.length > 0 ? (
-                  <div className="text-yellow-500 text-sm flex items-center gap-1 truncate">
-                    <CircleAlert className="w-4 h-4 flex-shrink-0" />
-                    <span className="truncate">{timeWarnings[0]}</span>
-                  </div>
-                ) : (() => {
-                  const status =
-                    (formExternal.status || formInternal.status || formDepartmental.status || "").trim();
-                  const eventObj = Array.isArray(events)
-                    ? events.find(
-                      (ev) => ev.id === timeFields.id || ev.originalId === timeFields.id
-                    )
-                    : undefined;
-                  const approver =
-                    eventObj && staffs?.find((s) => String(s.id) === String(eventObj.approver_id));
-                  const approverName = approver
-                    ? `${approver.first_name} ${approver.last_name}`
-                    : eventObj?.approver_id
-                      ? `ID ${eventObj.approver_id}`
-                      : "";
-
-                  if (status) {
-                    const statusIcon =
-                      status.toLowerCase() === "approved" ? (
-                        <CheckCircle2 className="inline w-3 h-3 mr-1 mb-0.5 text-gray-500" />
-                      ) : status.toLowerCase() === "declined" ? (
-                        <XCircle className="inline w-3 h-3 mr-1 mb-0.5 text-gray-500" />
-                      ) : (
-                        <Hourglass className="inline w-3 h-3 mr-1 mb-0.5 text-gray-500" />
-                      );
-
-                    return (
-                      <div className="flex gap-4 items-center text-xs text-gray-500 font-medium truncate">
-                        <span className="flex items-center truncate">
-                          {statusIcon}
-                          Status:
-                          <span className="ml-1 font-semibold text-gray-700 truncate">
-                            {status.toLowerCase() === "pending"
-                              ? "For Approval"
-                              : status.charAt(0).toUpperCase() + status.slice(1)}
-                          </span>
-                        </span>
-                        {/* <span className="flex items-center truncate">
-                          <UserRoundPenIcon className="inline w-3 h-3 mr-1 mb-0.5" />
-                          Approver:
-                          <span className="ml-1 font-semibold text-gray-700 truncate">
-                            {approverName}
-                          </span>
-                        </span> */}
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
-              </div>
-            </div>
-
-          </div>
-
-          {/* Right column: Date & hours, then calendar */}
-          <div className="flex flex-col gap-4 w-full md:w-[340px] min-w-[260px]">
-            <div className="flex flex-col gap-2 w-full md:w-[340px] min-w-[260px]">
-              <div className="px-3 py-2 border-b bg-gray-50 flex items-center gap-2">
-                <CalendarDays className="w-5 h-5 text-gray-500" />
-                <span className="text-sm font-semibold text-gray-700">
-                  {timeFields.start_time
-                    ? moment(timeFields.start_time).format("dddd, MMMM DD, YYYY")
-                    : "No date selected"}
+            {/* Status Footer - Compact */}
+            <div className={cn(
+              "mt-4 p-2.5 rounded-md flex items-center justify-between text-xs transition-colors duration-200 shrink-0",
+              (formExternal.status || formInternal.status || formDepartmental.status || "pending").toLowerCase() === "approved" ? "bg-emerald-50 text-emerald-900 border border-emerald-100" :
+                (formExternal.status || formInternal.status || formDepartmental.status || "pending").toLowerCase() === "declined" ? "bg-red-50 text-red-900 border border-red-100" :
+                  "bg-gray-50 text-gray-700 border border-gray-100"
+            )}>
+              <div className="flex items-center gap-1.5">
+                <Clock size={14} className="opacity-70" />
+                <span className="font-semibold">
+                  {(getCurrentDuration()?.duration ?? 0).toFixed(2)} Hours
+                  <span className="mx-2 opacity-30">|</span>
+                  {(() => {
+                    const st = (formExternal.status || formInternal.status || formDepartmental.status || "pending").toLowerCase();
+                    if (st === "approved") return "Approved";
+                    if (st === "declined") return "Declined";
+                    return "For Approval";
+                  })()}
                 </span>
               </div>
-              <div>
+
+              <div className="flex items-center gap-2">
+                {Object.keys(inputErrors).length > 0 ? (
+                  <div className="flex items-center gap-1 text-red-600 font-medium">
+                    <CircleX size={14} />
+                    <span className="truncate max-w-[320px]">{Object.values(inputErrors)[0]}</span>
+                  </div>
+                ) : timeWarnings.length > 0 ? (
+                  <div className="flex items-center gap-1 text-yellow-600 font-medium">
+                    <CircleAlert size={14} />
+                    <span className="truncate max-w-[320px]">{timeWarnings[0]}</span>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Action Buttons - Compact */}
+            <div className="mt-3 flex items-center justify-between shrink-0 mb-1">
+              {modalStatus === "edit" && ["approved", "declined"].includes((formExternal.status || formInternal.status || formDepartmental.status || "").toLowerCase()) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={loading}
+                  onClick={async () => {
+                    try {
+                      setLoading(true);
+                      await api("reopen", { ...headerReq }, { time_charge_ids: [timeFields.id] });
+                      toast.success("Time charge reopened successfully", {
+                        description: "The entry has been reset to pending status.",
+                        duration: 3000,
+                      });
+                      setEvents(prev => prev.map(ev => {
+                        if (String(ev.id) === String(timeFields.id) || String(ev.originalId) === String(timeFields.id)) {
+                          return { ...ev, status: "pending" };
+                        }
+                        return ev;
+                      }));
+                      onClose();
+                    } catch (err) {
+                      toast.error("Failed to reopen time charge");
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 h-8 px-3"
+                >
+                  <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                  Reopen
+                </Button>
+              )}
+              {modalStatus === "edit" && (formExternal.status || formInternal.status || formDepartmental.status || "").toLowerCase() !== "approved" && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={disableAll || loading}
+                      className="text-red-500 hover:text-red-600 hover:bg-red-50 h-8 px-3"
+                    >
+                      Delete
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Time Charge</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete this time charge entry.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="h-9 rounded-lg">Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="h-9 rounded-lg bg-red-500 hover:bg-red-600 text-white"
+                        onClick={async () => {
+                          setLoading(true);
+                          try {
+                            await api("time_charge_delete", { ...headerReq, id: timeFields.id });
+                            setEvents(prev => prev.filter(ev => String(ev.id) !== String(timeFields.id) && String(ev.originalId) !== String(timeFields.id)));
+                            toast.success("Time charge deleted successfully", {
+                              description: "The entry has been removed from your calendar.",
+                              duration: 3000,
+                            });
+                            onClose();
+                          } catch (err) {
+                            toast.error("Failed to delete time charge");
+                          } finally { setLoading(false); }
+                        }}
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+              <div className="flex-1"></div>
+              {!disableAll && (
+                <div className="relative inline-flex group" style={{ padding: 20, margin: -20 }}>
+                  <SaveSparkleEffect
+                    active={isSaved && !isDirty}
+                    sparkColor="#000"
+                    sparkSize={4}
+                    sparkRadius={12}
+                    sparkCount={30}
+                    offset={20}
+                  />
+                  <Button
+                    onClick={async (e) => {
+                      // Only mark as saved if no validation errors
+                      if (Object.keys(inputErrors).length > 0) {
+                        handleSubmit(e);
+                        return;
+                      }
+                      await handleSubmit(e);
+                      savedAtCounter.current = formChangeCounter.current;
+                      setIsSaved(true);
+                      setIsDirty(false);
+                    }}
+                    disabled={loading || (isSaved && !isDirty)}
+                    size="sm"
+                    className={cn(
+                      "px-6 h-8 rounded-full text-xs font-medium shadow-sm transition-all duration-300 relative z-10",
+                      isSaved && !isDirty
+                        ? "bg-zinc-500 text-white cursor-default"
+                        : "bg-primary hover:bg-primary/90 text-white"
+                    )}
+                  >
+                    {loading ? (
+                      <ReactLoading type="spin" color="#ffffff" height={14} width={14} />
+                    ) : isSaved && !isDirty ? (
+                      "Saved"
+                    ) : (
+                      "Save Changes"
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right Column: Calendar & Summary (Fixed/Non-scrollable mostly) */}
+          <div className="bg-gray-50/50 flex flex-col h-full overflow-hidden relative">
+            {/* Day Navigation Header */}
+            <div className="px-3 py-2.5 flex-shrink-0 bg-gray-50/80 z-10 w-full">
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={handlePrevDay}
+                  className="p-1.5 rounded-lg border border-gray-200 bg-white shadow-sm hover:bg-gray-50 hover:border-gray-300 active:scale-95 transition-all duration-150 text-gray-500 hover:text-gray-700"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-white rounded-lg border shadow-sm">
+                    <CalendarDays className="w-3.5 h-3.5 text-primary" />
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-xs font-semibold text-gray-900">
+                      {moment(calendarDate).format("MMMM D")}
+                    </span>
+                    <span className="text-[10px] text-gray-500 font-medium">
+                      {moment(calendarDate).format("dddd, YYYY")}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleNextDay}
+                  className="p-1.5 rounded-lg border border-gray-200 bg-white shadow-sm hover:bg-gray-50 hover:border-gray-300 active:scale-95 transition-all duration-150 text-gray-500 hover:text-gray-700"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Calendar Container */}
+            <div className="flex-1 px-4 overflow-y-auto min-h-0 relative mb-4">
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden h-full">
+                {/* We force h-full on wrapper, but RBC needs specific height. We can use flex-1 */}
+                <style>
+                  {`
+                    .rbc-time-view, .rbc-month-view { border: none !important; }
+                    .rbc-day-slot .rbc-time-slot { border-top: 1px solid #f3f4f6; }
+                    .rbc-current-time-indicator { background-color: #ef4444; }
+                    .custom-calendar-height { height: 100% !important; }
+                    `}
+                </style>
                 {renderTimeGrid()}
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Footer with total hours, buttons, and error status */}
-        <div className="pl-2 pt-2 pb-4 flex items-center justify-between gap-4">
-          {/* Center: Action Buttons */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {loading ? (
-              <div className="flex justify-center">
-                <ReactLoading type="bars" color="#888888" height={40} width={40} />
+            {/* Totals Footer - Moved to Bottom */}
+            <div className="px-4 pb-4 pt-0 shrink-0">
+              <div className="flex items-center px-4 py-1.5 bg-white border border-gray-200 rounded-full shadow-sm text-xs w-full max-w-fit mx-auto">
+                <div className="flex items-center gap-1.5 pr-3 border-r border-gray-100">
+                  <Clock size={13} className="text-gray-400" />
+                  <span className="font-bold text-gray-900">{(regHours + otHours + leaveHours).toFixed(2)}h</span>
+                  <span className="text-gray-400 font-medium text-[11px]">Total</span>
+                </div>
+
+                <div className="flex items-center gap-1.5 px-3 border-r border-gray-100">
+                  <span className="font-bold text-emerald-600">{regHours.toFixed(2)}h</span>
+                  <span className="text-gray-400 font-medium text-[11px]">Reg</span>
+                </div>
+
+                <div className="flex items-center gap-1.5 px-3 border-r border-gray-100">
+                  <span className="font-bold text-orange-600">{otHours.toFixed(2)}h</span>
+                  <span className="text-gray-400 font-medium text-[11px]">OT</span>
+                </div>
+
+                <div className="flex items-center gap-1.5 pl-3">
+                  <span className="font-bold text-blue-600">{leaveHours.toFixed(2)}h</span>
+                  <span className="text-gray-400 font-medium text-[11px]">Leave</span>
+                </div>
               </div>
-            ) : (
-              <>
-                {!disableAll && (
-                  <button type="submit" className="px-8 py-2 bg-primary text-white text-sm rounded-full hover:opacity-90 transition-opacity">
-                    Save
-                  </button>
-                )}
-
-                {modalStatus === "edit" && (formExternal.status || formInternal.status || formDepartmental.status || "").toLowerCase() !== "approved" && (
-                  <button
-                    type="button"
-                    className="px-4 py-2 bg-red-500 text-sm text-white rounded-full hover:bg-red-600 transition-colors"
-                    onClick={async () => {
-                      setLoading(true);
-                      try {
-                        await api("time_charge_delete", { ...headerReq, id: timeFields.id });
-                        setEvents(prevEvents =>
-                          prevEvents.filter(ev =>
-                            String(ev.id) !== String(timeFields.id) && String(ev.originalId) !== String(timeFields.id)
-                          ));
-                        onClose();
-                      } catch (err) {
-                        // console.error(err);
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
-                    disabled={disableAll}
-                  >
-                    Delete
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Right: Total Hours */}
-          <div className="flex items-center border bg-white text-xs text-gray-700 py-2 px-2 rounded-full ml-auto justify-end w-auto max-w-full">
-            <div className="flex items-center gap-1">
-              <CalendarClock className="text-gray-500 w-4 h-4" />
-              <span className="font-semibold text-gray-700">{(regHours + otHours).toFixed(2)}h</span>
-              <span className="text-gray-500">Total</span>
-              <span className="text-gray-300 mx-1">|</span>
-              <span className="font-semibold text-green-600">{regHours.toFixed(2)}h</span>
-              <span className="text-gray-500">Reg</span>
-              <span className="text-gray-300 mx-1">|</span>
-              <span className="font-semibold text-orange-600">{otHours.toFixed(2)}h</span>
-              <span className="text-gray-500">OT</span>
-              <span className="text-gray-300 mx-1">|</span>
-              <span className="font-semibold text-blue-600">{leaveHours.toFixed(2)}h</span>
-              <span className="text-gray-500">Leave</span>
-              {/* {leaveTypesArr.length > 0 && (
-                    <span className="text-gray-400">({leaveTypesArr.join(", ")})</span>
-                  )} */}
             </div>
+
           </div>
         </div>
       </form>
@@ -1457,6 +1644,8 @@ const CalendarModal = ({
         is_ot: ev.is_ot || false,
         next_day_ot: ev.next_day_ot || false,
         chargeType: ev.chargeType || "",
+        project_label: ev.project_label || "",
+        project_code: ev.project_code || "",
         stage_label: ev.stage_label || "",
         activity: ev.activity || "",
         type: ev.type || "timeCharge",
@@ -1490,6 +1679,14 @@ const CalendarModal = ({
                   : "";
           return (status && status.toLowerCase() === "pending") ? "" : status;
         })(),
+        project_label: (() => {
+          return timeFields.option === "external"
+            ? formExternal.project_label
+            : timeFields.option === "internal"
+              ? formInternal.project_label
+              : "";
+        })(),
+        project_code: timeFields.option === "external" ? formExternal.project_code : "",
         stage_label: (() => {
           return timeFields.option === "external"
             ? formExternal.stage_label
@@ -1499,7 +1696,13 @@ const CalendarModal = ({
                 ? formDepartmental.stage_label
                 : "";
         })(),
-        activity: timeFields.activity || "",
+        activity: (() => {
+          return timeFields.option === "external"
+            ? formExternal.activity
+            : timeFields.option === "departmental"
+              ? formDepartmental.activity
+              : "";
+        })(),
         chargeType:
           timeFields.option === "external"
             ? "external"
@@ -1512,10 +1715,8 @@ const CalendarModal = ({
       });
     }
 
-    // Only show the selected date
-    const date = timeFields?.start_time
-      ? new Date(timeFields.start_time)
-      : new Date();
+    // Use the calendarDate for the preview (allows browsing other days)
+    const date = calendarDate || new Date();
 
     // Helper to check if status is final
     const isFinalStatus = status =>
@@ -1691,20 +1892,19 @@ const CalendarModal = ({
 
   // Minimal, modern modal layout
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl md:max-w-4xl xl:max-w-5xl relative overflow-hidden max-h-[80vh] flex flex-col">
-        <div className="flex items-center justify-between border-b px-6 py-4 flex-shrink-0">
-          <h2 className="text-lg font-semibold tracking-tight">{getModalTitle()}</h2>
-          <button className="text-gray-400 hover:text-gray-700 text-2xl" onClick={onClose}>
-            &times;
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-[1000px] h-auto max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between border-b px-5 py-3 flex-shrink-0 bg-white z-10">
+          <h2 className="text-base font-semibold tracking-tight text-gray-900">{getModalTitle()}</h2>
+          <button
+            className="text-gray-400 hover:text-gray-900 transition-colors p-1 rounded-full hover:bg-gray-100"
+            onClick={onClose}
+          >
+            <X size={18} />
           </button>
         </div>
-        <div className="px-4 pt-2 flex-1 overflow-y-auto min-h-0">
-          {renderTabs()}
-          <div className="flex flex-col h-full">
-            {/* {modalType === "timeCharge" ? renderTimeChargeForm() : renderLeaveForm()} */}
-            {modalType === "timeCharge" ? renderTimeChargeForm() : null}
-          </div>
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {modalType === "timeCharge" ? renderTimeChargeForm() : null}
         </div>
       </div>
     </div>
