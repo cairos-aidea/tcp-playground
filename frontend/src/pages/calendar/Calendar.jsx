@@ -14,7 +14,13 @@ import { errorNotification, successNotification, pendingNotification } from '../
 import CalendarToolbar from './components/CalendarToolbar';
 import CalendarLegend from './components/CalendarLegend';
 import CursorTimeTooltip from './components/CursorTimeTooltip';
-import { SendHorizonal, SendHorizontal, X, CheckCircle, Plus } from 'lucide-react';
+import { SendHorizonal, SendHorizontal, X, CheckCircle, Plus, HelpCircle } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import ReactLoading from 'react-loading';
 import Search from '../../components/navigations/Search';
 
@@ -100,6 +106,7 @@ const Calendar = () => {
 
   // Slot selection tracking for cursor tooltip
   const [selectingRange, setSelectingRange] = useState(null);
+  const [showHelpDialog, setShowHelpDialog] = useState(false);
 
   // Helper: validate event move/resize
   const validateEventChange = (eventId, newStart, newEnd) => {
@@ -1063,9 +1070,16 @@ const Calendar = () => {
             end={selectingRange?.end}
           />
 
-          {/* Footer Legend */}
-          <div className="border-t border-border bg-background">
+          {/* Footer Legend + Help Badge */}
+          <div className="border-t border-border bg-background relative">
             <CalendarLegend />
+            <button
+              onClick={() => setShowHelpDialog(true)}
+              className="absolute right-3 bottom-1/2 translate-y-1/2 inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full border border-zinc-300 text-zinc-500 bg-white hover:bg-zinc-50 hover:border-zinc-400 transition-colors"
+            >
+              <HelpCircle size={13} />
+              Need help?
+            </button>
           </div>
 
           {showSplitPrompt && (
@@ -1271,6 +1285,21 @@ const Calendar = () => {
           )}
         </div>
       </div>
+
+      {/* User Manual Dialog */}
+      <Dialog open={showHelpDialog} onOpenChange={setShowHelpDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <HelpCircle size={18} className="text-zinc-500" />
+              User Manual
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 text-sm text-muted-foreground">
+            Your user manual content will be here.
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

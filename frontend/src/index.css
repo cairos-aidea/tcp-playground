@@ -206,6 +206,10 @@
   display: none !important;
 }
 
+.rbc-slot-selection {
+  border-radius: 8px !important;
+}
+
 .rbc-month-row {
   overflow: visible !important;
   flex: none !important;
