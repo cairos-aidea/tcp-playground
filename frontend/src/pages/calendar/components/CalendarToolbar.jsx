@@ -1,6 +1,7 @@
 
-import { ChevronLeft, ChevronRight, AlertCircle, Clock, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertCircle, Clock, CheckCircle2, Filter, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { motion, AnimatePresence } from "framer-motion";
 import {
     Select,
     SelectContent,
@@ -9,13 +10,38 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useSidebar } from "@/components/ui/sidebar";
 
 const MONTHS = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-const CalendarToolbar = ({ userHireDate, events, date, label, localizer, onNavigate, onView, views, view, children, showSidebarOptions, setShowSidebarOptions, isMobile }) => {
+import CalendarFilters from "./CalendarFilters";
+
+const CalendarToolbar = ({
+    userHireDate,
+    events,
+    date,
+    label,
+    localizer,
+    onNavigate,
+    onView,
+    views,
+    view,
+    children,
+    showSidebarOptions,
+    setShowSidebarOptions,
+    isMobile,
+    filters,
+    setFilters,
+    filterOptions,
+    showFilters,
+    setShowFilters
+}) => {
+
+    const { state: sidebarState } = useSidebar();
+    const isSidebarOpen = sidebarState === "expanded";
 
     // Helper to get current week number of the month/year
     const getWeekNumber = (d) => {
@@ -183,7 +209,7 @@ const CalendarToolbar = ({ userHireDate, events, date, label, localizer, onNavig
             );
         } else {
             statsContent = (
-                <div className="flex items-center gap-2">
+                <div className={cn("flex gap-2", "flex-row items-center")}>
                     {/* Missing hours pill */}
                     <div className={cn(
                         "flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-full border text-xs font-medium transition-colors",
@@ -192,7 +218,7 @@ const CalendarToolbar = ({ userHireDate, events, date, label, localizer, onNavig
                             : "border-red-300 bg-red-50 text-red-700"
                     )}>
                         <span className={cn(
-                            "flex items-center justify-center w-5 h-5 rounded-full shrink-0",
+                            "flex items-center justify-center rounded-full shrink-0 w-5 h-5",
                             stats.missingHours === 0 ? "bg-emerald-100" : "bg-red-100"
                         )}>
                             {stats.missingHours === 0
@@ -214,7 +240,7 @@ const CalendarToolbar = ({ userHireDate, events, date, label, localizer, onNavig
                             : "border-amber-300 bg-amber-50 text-amber-700"
                     )}>
                         <span className={cn(
-                            "flex items-center justify-center w-5 h-5 rounded-full shrink-0",
+                            "flex items-center justify-center rounded-full shrink-0 w-5 h-5",
                             stats.pendingHours === 0 ? "bg-emerald-100" : "bg-amber-100"
                         )}>
                             {stats.pendingHours === 0
@@ -234,10 +260,10 @@ const CalendarToolbar = ({ userHireDate, events, date, label, localizer, onNavig
 
     return (
         <div className="flex flex-col gap-6 mb-6">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+            <div className="flex items-center justify-between h-[52px]">
+                <div className="flex items-center gap-4 shrink-0">
                     {/* Date Badge - Shows selected date/current view date details */}
-                    <div className="flex items-center px-3 py-2 rounded-lg border bg-muted/50">
+                    <div className="flex items-center px-3 py-2 rounded-lg border bg-muted/50 shrink-0">
                         <div className="text-center pr-3 border-r border-border">
                             <div className="text-[10px] font-medium text-primary uppercase tracking-wider">
                                 {shortMonth}
@@ -260,11 +286,66 @@ const CalendarToolbar = ({ userHireDate, events, date, label, localizer, onNavig
                         </div>
                     </div>
 
-                    {/* Stats Bar */}
-                    {statsContent}
+                    {/* Stats Bar - always visible */}
+                    {statsContent && (
+                        <div>{statsContent}</div>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-2">
+                    {/* Filter Toggle + Absolutely Positioned Filters */}
+                    <div className="relative">
+                        <AnimatePresence>
+                            {showFilters && filters && setFilters && (
+                                <motion.div
+                                    key="filters"
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    transition={{ duration: 0.15, ease: "easeOut" }}
+                                    style={{ transformOrigin: "top right" }}
+                                    className="absolute right-0 top-full mt-1 z-50"
+                                >
+                                    <div className="flex items-center gap-2 px-3 py-1.5 bg-background rounded-lg border border-border shadow-md">
+                                        <CalendarFilters
+                                            filters={filters}
+                                            setFilters={setFilters}
+                                            filterOptions={filterOptions}
+                                        />
+                                        {(filters.status !== 'all' || filters.type !== 'all' || filters.projectId || filters.stageId || filters.departmentalTaskId || filters.activity || filters.isOvertime) && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setFilters({
+                                                        status: 'all',
+                                                        type: 'all',
+                                                        projectId: null,
+                                                        stageId: null,
+                                                        departmentalTaskId: null,
+                                                        activity: '',
+                                                        isOvertime: false
+                                                    });
+                                                }}
+                                                className="text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-md hover:bg-muted text-[11px] font-medium whitespace-nowrap"
+                                            >
+                                                Clear
+                                            </button>
+                                        )}
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        <Button
+                            variant={showFilters ? "secondary" : "outline"}
+                            size="icon"
+                            onClick={() => setShowFilters(!showFilters)}
+                            className="h-9 w-9"
+                        >
+                            <Filter className="h-4 w-4" />
+                        </Button>
+                    </div>
+
                     {/* Navigation */}
                     <Button
                         variant="outline"

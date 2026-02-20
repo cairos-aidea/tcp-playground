@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { PageContainer } from "@/components/ui/PageContainer";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
-import { Check, X, Filter, RefreshCw } from 'lucide-react';
+import { Check, X, Filter, RefreshCw, CircleCheck } from 'lucide-react';
 import { useAppData } from '../../context/AppDataContext';
 import { useApprovals, useApprovalActions } from '../../hooks/useApprovals';
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,15 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
 import {
   Tooltip,
   TooltipContent,
@@ -27,6 +36,17 @@ const formatDate = (dateString) => {
   return new Date(dateString).toLocaleDateString('en-US', {
     year: 'numeric', month: 'short', day: 'numeric'
   });
+};
+
+// Helper for formatting time (HH:MM -> 12h AM/PM)
+const formatTime = (timeStr) => {
+  if (!timeStr) return '';
+  // Expecting "HH:MM" or "HH:MM:SS"
+  const [hour, minute] = timeStr.split(':');
+  let h = parseInt(hour, 10);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${minute} ${ampm}`;
 };
 
 const ApprovalList = () => {
@@ -43,6 +63,7 @@ const ApprovalList = () => {
     project_id: null, stage_id: null, staff_id: null, status: null
   });
   const [search, setSearch] = useState("");
+  const [selectedRemark, setSelectedRemark] = useState(null);
 
   // React Query Hooks
   const { data: timeCharges, isLoading, isFetching, refetch } = useApprovals(page, filter, itemsPerPage);
@@ -130,12 +151,51 @@ const ApprovalList = () => {
       cell: ({ row }) => {
         const { project_code, project_label } = row.original;
         return (
-          <div className="flex flex-col">
+          <div className="flex flex-col max-w-[200px]">
             {project_code && <span className="font-medium">{project_code}</span>}
-            <span>{project_label}</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="truncate cursor-default">{project_label}</span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{project_label}</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
         );
       }
+    },
+    {
+      accessorKey: "stage_label",
+      header: "Stage",
+      cell: ({ row }) => (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="text-sm text-muted-foreground truncate block max-w-[150px] cursor-default">
+              {row.original.stage_label || '-'}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{row.original.stage_label || '-'}</p>
+          </TooltipContent>
+        </Tooltip>
+      )
+    },
+    {
+      accessorKey: "activity",
+      header: "Activity",
+      cell: ({ row }) => (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="text-sm truncate block max-w-[150px] cursor-default">
+              {row.original.activity || '-'}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{row.original.activity || '-'}</p>
+          </TooltipContent>
+        </Tooltip>
+      )
     },
     {
       accessorKey: "duration",
@@ -143,8 +203,55 @@ const ApprovalList = () => {
       cell: ({ row }) => {
         const hrs = Number(row.original.duration_hrs || 0);
         const mins = Number(row.original.duration_min || 0);
-        return `${hrs}h ${mins > 0 ? mins + 'm' : ''}`;
+        const startTime = row.original.start_time;
+        const endTime = row.original.end_time;
+
+        return (
+          <div className="flex flex-col items-start gap-1">
+            <Badge variant="secondary" className="font-mono text-xs font-normal">
+              {(hrs + mins / 60).toFixed(2)}h
+            </Badge>
+            {(startTime && endTime) && (
+              <span className="text-[10px] text-muted-foreground">
+                {formatTime(startTime)} - {formatTime(endTime)}
+              </span>
+            )}
+          </div>
+        );
       }
+    },
+    {
+      accessorKey: "is_ot",
+      header: "OT",
+      cell: ({ row }) => row.original.is_ot ? (
+        <div className="flex justify-center">
+          <CircleCheck className="h-4 w-4 text-gray-500" />
+        </div>
+      ) : null,
+      enableSorting: true,
+    },
+    {
+      accessorKey: "remarks",
+      header: "Remarks",
+      cell: ({ row }) => (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div
+              className="max-w-[200px] truncate text-xs text-muted-foreground cursor-pointer hover:underline hover:text-foreground transition-colors"
+              onClick={() => setSelectedRemark({
+                content: row.original.remarks,
+                type: 'Remarks',
+                user: row.original.user
+              })}
+            >
+              {row.original.remarks || '-'}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-[300px] break-words">
+            <p>{row.original.remarks || '-'}</p>
+          </TooltipContent>
+        </Tooltip>
+      )
     },
     {
       accessorKey: "status",
@@ -281,6 +388,26 @@ const ApprovalList = () => {
       {/* Pagination Control needed if DataTable doesn't handle server-side paging built-in 
             For now assuming DataTable handles local or we add a footer pagination 
         */}
+
+      {/* Remarks Dialog */}
+      <Dialog open={!!selectedRemark} onOpenChange={(open) => !open && setSelectedRemark(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remarks</DialogTitle>
+            <DialogDescription>
+              From {selectedRemark?.user?.first_name} {selectedRemark?.user?.last_name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm leading-relaxed whitespace-pre-wrap">
+              {selectedRemark?.content || "No remarks provided."}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedRemark(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useQueryClient } from "@tanstack/react-query";
 import moment from 'moment';
 import "moment-timezone";
@@ -15,7 +15,8 @@ import { errorNotification, successNotification, pendingNotification } from '../
 import CalendarToolbar from './components/CalendarToolbar';
 import CalendarLegend from './components/CalendarLegend';
 import CursorTimeTooltip from './components/CursorTimeTooltip';
-import { SendHorizonal, SendHorizontal, X, CheckCircle, Plus, HelpCircle } from 'lucide-react';
+import { SendHorizonal, SendHorizontal, X, CheckCircle, Plus, HelpCircle, Filter } from 'lucide-react';
+import CalendarFilters from './components/CalendarFilters';
 import {
   Dialog,
   DialogContent,
@@ -105,6 +106,19 @@ const Calendar = () => {
 
   const [timeEntryStats, setTimeEntryStats] = useState({});
   const [showSidebarOptions, setShowSidebarOptions] = useState('filter');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Filter State
+  const [filters, setFilters] = useState({
+    status: 'all',
+    type: 'all',
+    projectId: null,
+    stageId: null,
+    departmentalTaskId: null,
+    activity: '',
+    isOvertime: false
+  });
+
 
   // Slot selection tracking for cursor tooltip
   const [selectingRange, setSelectingRange] = useState(null);
@@ -482,7 +496,122 @@ const Calendar = () => {
         task_name: t.task_name,
       }));
   }, [departmentalTasks]);
+
+  const uniqueActivityOptions = useMemo(() => {
+    const activities = new Set();
+    if (events && Array.isArray(events)) {
+      events.forEach(ev => {
+        if (ev.activity) {
+          activities.add(ev.activity);
+        }
+      });
+    }
+    return Array.from(activities).sort().map(a => ({ value: a, label: a }));
+  }, [events]);
   // END DROPDOWN OPTIONS
+
+  // --- FILTER LOGIC ---
+  const filteredEvents = useMemo(() => {
+    return events.filter(event => {
+      // 1. Status Filter
+      if (filters.status !== 'all') {
+        const status = (event.status || 'pending').toLowerCase();
+        if (filters.status === 'approved' && status !== 'approved') return false;
+        if (filters.status === 'pending' && status !== 'pending') return false;
+        if (filters.status === 'declined' && status !== 'declined') return false;
+      }
+
+      // 2. Type Filter
+      if (filters.type !== 'all') {
+        if (event.type !== 'timeCharge') return false;
+        if (filters.type === 'external' && event.chargeType !== 'external') return false;
+        if (filters.type === 'internal' && event.chargeType !== 'internal') return false;
+        if (filters.type === 'departmental' && event.chargeType !== 'departmental') return false;
+      }
+
+      // 3. Project Filter (External/Internal)
+      if (filters.projectId) {
+        if (String(event.project_id) !== String(filters.projectId)) return false;
+      }
+
+      // 4. Stage Filter (External)
+      if (filters.stageId) {
+        if (String(event.stage_id) !== String(filters.stageId)) return false;
+      }
+
+      // 5. Activity Filter (Exact match for dropdown)
+      if (filters.activity) {
+        if (event.activity !== filters.activity) return false;
+      }
+
+      // 6. Departmental Task Filter
+       if (filters.departmentalTaskId) {
+          if (String(event.departmental_task_id) !== String(filters.departmentalTaskId)) return false;
+       }
+
+      // 7. Overtime Filter
+      if (filters.isOvertime) {
+        if (!event.is_ot) return false;
+      }
+
+      return true;
+    });
+  }, [events, filters]);
+
+  // --- FILTERED DROPDOWN OPTIONS (Based on Events) ---
+  const uniqueExternalProjects = useMemo(() => {
+    if (!events || !Array.isArray(events)) return [];
+    const usedIds = new Set(
+      events
+        .filter(e => e.activity && e.chargeType === 'external') // Check activity or type
+        .map(e => String(e.project_id))
+    );
+    // Also include currently selected project if any, to avoid it disappearing
+    if (filters.projectId && filters.type === 'external') usedIds.add(String(filters.projectId));
+    
+    return externalProjectOptions.filter(opt => usedIds.has(String(opt.value)));
+  }, [events, externalProjectOptions, filters.projectId, filters.type]);
+
+  const uniqueInternalProjects = useMemo(() => {
+    if (!events || !Array.isArray(events)) return [];
+    const usedIds = new Set(
+        events
+          .filter(e => e.activity && e.chargeType === 'internal')
+          .map(e => String(e.project_id))
+      );
+    if (filters.projectId && filters.type === 'internal') usedIds.add(String(filters.projectId));
+
+    return internalProjectOptions.filter(opt => usedIds.has(String(opt.value)));
+  }, [events, internalProjectOptions, filters.projectId, filters.type]);
+
+  const uniqueDepartmentalTasks = useMemo(() => {
+    if (!events || !Array.isArray(events)) return [];
+    const usedIds = new Set(
+        events
+          .filter(e => e.activity && e.chargeType === 'departmental')
+          .map(e => String(e.departmental_task_id))
+      );
+    if (filters.departmentalTaskId && filters.type === 'departmental') usedIds.add(String(filters.departmentalTaskId));
+
+    return departmentalTaskOptions.filter(opt => usedIds.has(String(opt.value)));
+  }, [events, departmentalTaskOptions, filters.departmentalTaskId, filters.type]);
+
+
+
+  // Helper to get stages for a specific project ID (for filters)
+  const getProjectStages = useCallback((projectId) => {
+    if (!projectId) return [];
+    const selectedProject = (projects || []).find(p => String(p.id) === String(projectId));
+    const selectedCode = selectedProject ? selectedProject.project_code : "";
+    
+    return (projectStages || [])
+      .filter(stage => stage.project_code === selectedCode)
+      .map(stage => ({
+        value: stage.id,
+        label: stage.stage_name,
+        stage_label: stage.stage_name,
+      }));
+  }, [projects, projectStages]);
 
   const closeModal = () => {
     setShowModal(false);
@@ -845,6 +974,8 @@ const Calendar = () => {
             setEvents(allEvents);
             queryClient.invalidateQueries({ queryKey: ['approvals'] });
             successNotification({ title: "Success", message: "Time charge created successfully." });
+            // Clear start/end times after successful creation so the dragged range doesn't persist
+            setTimeFields(tf => ({ ...tf, start_time: "", end_time: "" }));
           } else {
             errorNotification({ title: "Error", message: apiResult?.message || "Failed to create time charge. Please try again." });
             return;
@@ -924,6 +1055,31 @@ const Calendar = () => {
     <CustomDateHeader {...props} getDayTotals={getDayTotals} isMobile={windowWidth < 640} />
   );
 
+  // Stable toolbar: store dynamic props in a ref so the component reference never changes
+  const toolbarPropsRef = useRef({});
+  toolbarPropsRef.current = {
+    userHireDate: auth_user.hire_date,
+    events,
+    showSidebarOptions,
+    setShowSidebarOptions,
+    isMobile: windowWidth < 640,
+    showFilters,
+    setShowFilters,
+    filters,
+    setFilters,
+    filterOptions: {
+      externalProjectOptions: uniqueExternalProjects,
+      externalProjectStages: getProjectStages,
+      internalProjectOptions: uniqueInternalProjects,
+      departmentalTaskOptions: uniqueDepartmentalTasks,
+      uniqueActivityOptions
+    }
+  };
+
+  const StableToolbar = useCallback((props) => (
+    <CalendarToolbar {...props} {...toolbarPropsRef.current} />
+  ), []);
+
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] -m-8 overflow-hidden bg-background">
       <div className="flex-1 flex flex-col p-6 overflow-hidden gap-4">
@@ -941,14 +1097,11 @@ const Calendar = () => {
                   setModalStatus("create");
                   setModalType("timeCharge");
                   setShowModal(true);
-                  const now = moment();
-                  const startString = now.format("YYYY-MM-DDTHH:mm");
-                  const endString = now.clone().add(1, 'hour').format("YYYY-MM-DDTHH:mm");
 
                   setTimeFields({
                     id: "",
-                    start_time: startString,
-                    end_time: endString,
+                    start_time: "",
+                    end_time: "",
                     is_ot: false,
                     next_day_ot: false,
                     ot_type: "",
@@ -976,7 +1129,7 @@ const Calendar = () => {
             <div className="h-full p-4">
               <BaseCalendar
                 localizer={localizer}
-                events={events}
+                events={filteredEvents}
                 selectable={true}
                 resizable={true}
                 defaultView={"week"}
@@ -1004,7 +1157,7 @@ const Calendar = () => {
                   week: {
                     header: (props) => <CustomWeekHeader {...props} event={props.event} />
                   },
-                  toolbar: (props) => <CalendarToolbar {...props} userHireDate={auth_user.hire_date} events={events} showSidebarOptions={showSidebarOptions} setShowSidebarOptions={setShowSidebarOptions} isMobile={windowWidth < 640} />,
+                  toolbar: StableToolbar,
                 }}
                 slotPropGetter={(date) => {
                   const day = date.getDay(); // 0 = Sunday, 6 = Saturday

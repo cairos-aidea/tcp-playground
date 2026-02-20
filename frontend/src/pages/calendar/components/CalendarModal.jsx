@@ -31,6 +31,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
 const DragAndDropCalendar = withDragAndDrop(DnDCalendar);
@@ -102,6 +108,19 @@ const CalendarModal = ({
   const [calendarDate, setCalendarDate] = useState(
     timeFields?.start_time ? new Date(timeFields.start_time) : new Date()
   );
+
+  // New logic for persistent "Clear Recents" - act as a threshold
+  // Only show items with ID greater than this threshold.
+  const [lastClearedThreshold, setLastClearedThreshold] = useState(() => {
+    const saved = localStorage.getItem("tcp_recent_cleared_threshold_id");
+    return saved ? Number(saved) : 0;
+  });
+  
+  const [hideRecents, setHideRecents] = useState(false);
+
+  // Initialize start/end times to empty for new entries ONLY if not from a slot drag
+  // (When the user drags a time range in the calendar, timeFields already have the correct start/end)
+  // When the user clicks the Log Time button, start/end are already set to "" by the parent.
 
   const studios = useMemo(() => {
     const seen = new Map();
@@ -789,45 +808,81 @@ const CalendarModal = ({
   };
 
   const renderRecentActivities = () => {
-    if (!recentExternalInputs || recentExternalInputs.length === 0) return null;
+    // Filter recents based on threshold
+    const visibleRecents = useMemo(() => {
+      if (!recentExternalInputs) return [];
+      return recentExternalInputs.filter(item => Number(item.id) > lastClearedThreshold);
+    }, [recentExternalInputs, lastClearedThreshold]);
+
+    if (hideRecents || visibleRecents.length === 0) return null;
     return (
       <div className="mb-2 pb-3 border-b border-gray-200 flex flex-col gap-2 w-full">
         <div className="flex items-center justify-between text-xs text-gray-500">
           <span>Your recent activities:</span>
+          <button 
+            type="button" 
+            onClick={() => {
+              const headId = visibleRecents[0]?.id;
+              if (headId) {
+                const newThreshold = Number(headId);
+                localStorage.setItem("tcp_recent_cleared_threshold_id", String(newThreshold));
+                setLastClearedThreshold(newThreshold);
+              }
+              // setHideRecents(true); // No need to hide manually if we update threshold, but can keep for instant feel if state update is slow (unlikely)
+            }}
+            className="text-primary hover:underline hover:text-blue-700"
+          >
+            Clear
+          </button>
         </div>
         <div className="flex flex-wrap gap-2 w-full items-center">
-          {recentExternalInputs.map((item, idx) => (
-            <button
-              key={item.id || idx}
-              type="button"
-              className="px-3 py-1 rounded bg-gray-100 hover:bg-primary/10 border text-xs text-gray-400 flex flex-col items-start gap-0 w-[180px] min-w-[180px]"
-              style={{ lineHeight: '1.1' }}
-              title={`${item.project_label} - ${item.stage_label} - ${item.activity}`}
-              onClick={() => {
-                setFormExternal(fe => ({
-                  ...fe,
-                  project_id: item.project_id,
-                  project_code: item.project_code,
-                  project_label: item.project_label,
-                  stage_id: item.stage_id,
-                  stage_label: item.stage_label,
-                  activity: item.activity
-                }));
-              }}
-            >
-              <div className="font-semibold flex items-center gap-1 w-full truncate">
-                <span className="text-gray-500">{item.project_code}</span>
-                <span className="text-gray-700 truncate" style={{ maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }}>
-                  {item.project_label}
-                </span>
-              </div>
-              <div className="text-gray-500 w-full truncate">
-                <span>{item.stage_label}</span>
-                {" - "}
-                <span className="text-gray-400">{item.activity}</span>
-              </div>
-            </button>
-          ))}
+            {visibleRecents.map((item, idx) => (
+              <Tooltip key={item.id || idx}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="px-3 py-1 rounded bg-gray-100 hover:bg-primary/10 border text-xs text-gray-400 flex flex-col items-start gap-0 w-[180px] min-w-[180px]"
+                    style={{ lineHeight: '1.1' }}
+                    onClick={() => {
+                      setFormExternal(fe => ({
+                        ...fe,
+                        project_id: item.project_id,
+                        project_code: item.project_code,
+                        project_label: item.project_label,
+                        stage_id: item.stage_id,
+                        stage_label: item.stage_label,
+                        activity: item.activity
+                      }));
+                    }}
+                  >
+                    <div className="font-semibold flex items-center gap-1 w-full truncate">
+                      <span className="text-gray-500">{item.project_code}</span>
+                      <span className="text-gray-700 truncate" style={{ maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }}>
+                        {item.project_label}
+                      </span>
+                    </div>
+                    <div className="text-gray-500 w-full truncate">
+                      <span>{item.stage_label}</span>
+                      {" - "}
+                      <span className="text-gray-400">{item.activity}</span>
+                    </div>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="start" className="max-w-[300px] break-words">
+                  <div className="flex flex-col gap-1">
+                    <div className="font-semibold text-xs border-b border-zinc-700 pb-1 mb-1">
+                      {item.project_code} - {item.project_label}
+                    </div>
+                    <div className="text-xs text-zinc-300">
+                      <span className="font-medium text-zinc-100">Stage:</span> {item.stage_label}
+                    </div>
+                    <div className="text-xs text-zinc-300">
+                      <span className="font-medium text-zinc-100">Activity:</span> {item.activity}
+                    </div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            ))}
         </div>
       </div>
     );
@@ -977,36 +1032,73 @@ const CalendarModal = ({
 
             <div className="space-y-3 flex-1">
               {/* Recent Inputs */}
-              {timeFields.option === "external" && formExternal.status !== "approved" && recentExternalInputs.length > 0 && (
+              {(function() {
+                 const visibleRecents = recentExternalInputs.filter(item => Number(item.id) > lastClearedThreshold);
+                 if (timeFields.option !== "external" || formExternal.status === "approved" || visibleRecents.length === 0 || hideRecents) return null;
+
+                 return (
                 <div className="mb-1">
-                  <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Recent</div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Recent</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const headId = visibleRecents[0]?.id;
+                        if (headId) {
+                          const newThreshold = Number(headId);
+                          localStorage.setItem("tcp_recent_cleared_threshold_id", String(newThreshold));
+                          setLastClearedThreshold(newThreshold);
+                        }
+                      }}
+                      className="text-[10px] text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      Clear
+                    </button>
+                  </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {recentExternalInputs.slice(0, 2).map((item, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => {
-                          setFormExternal({
-                            project_id: item.project_id,
-                            project_code: item.project_code,
-                            project_label: item.project_label,
-                            stage_id: item.stage_id,
-                            stage_label: item.stage_label,
-                            activity: item.activity,
-                            status: "pending"
-                          });
-                        }}
-                        className="bg-gray-50 hover:bg-primary/5 hover:border-primary/20 border border-gray-200 rounded px-2 py-1 text-left max-w-full transition-colors group"
-                      >
-                        <div className="flex items-center gap-1.5 w-full overflow-hidden">
-                          <span className="text-xs font-medium text-gray-700 truncate group-hover:text-primary">{item.project_code}</span>
-                          <span className="text-[10px] text-gray-400 truncate border-l pl-1.5">{item.stage_label}</span>
-                        </div>
-                      </button>
+                    {visibleRecents.slice(0, 2).map((item, idx) => (
+                      <Tooltip key={idx}>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormExternal({
+                                project_id: item.project_id,
+                                project_code: item.project_code,
+                                project_label: item.project_label,
+                                stage_id: item.stage_id,
+                                stage_label: item.stage_label,
+                                activity: item.activity,
+                                status: "pending"
+                              });
+                            }}
+                            className="bg-gray-50 hover:bg-primary/5 hover:border-primary/20 border border-gray-200 rounded px-2 py-1 text-left max-w-full transition-colors group"
+                          >
+                            <div className="flex items-center gap-1.5 w-full overflow-hidden">
+                              <span className="text-xs font-medium text-gray-700 truncate group-hover:text-primary">{item.project_code}</span>
+                              <span className="text-[10px] text-gray-400 truncate border-l pl-1.5">{item.stage_label}</span>
+                            </div>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" align="start" className="max-w-[300px] break-words">
+                          <div className="flex flex-col gap-1">
+                            <div className="font-semibold text-xs border-b border-zinc-700 pb-1 mb-1">
+                              {item.project_code} - {item.project_label}
+                            </div>
+                            <div className="text-xs text-zinc-300">
+                              <span className="font-medium text-zinc-100">Stage:</span> {item.stage_label}
+                            </div>
+                            <div className="text-xs text-zinc-300">
+                              <span className="font-medium text-zinc-100">Activity:</span> {item.activity}
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
                     ))}
                   </div>
                 </div>
-              )}
+                 );
+              })()}
 
               {/* Fields */}
               {timeFields.option === "external" && (
@@ -1142,19 +1234,31 @@ const CalendarModal = ({
               </div>
 
               <div className="space-y-1 pt-1">
-                <Label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Remarks</Label>
+              <div className="grid gap-2">
+                <Label htmlFor="remarks" className="flex justify-between">
+                    Remarks 
+                    <span className={`text-xs ${timeFields.remarks.length > 500 ? "text-red-500" : "text-gray-400"}`}>
+                        {timeFields.remarks.length}/500
+                    </span>
+                </Label>
                 <textarea
-                  className={cn(
-                    "flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none",
-                  )}
-                  rows={3}
+                  id="remarks"
+                  className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none overflow-y-auto"
                   value={timeFields.remarks}
-                  onChange={e => setTimeFields(tf => ({ ...tf, remarks: e.target.value }))}
+                  onChange={e => {
+                      if (e.target.value.length <= 500) {
+                        setTimeFields(tf => ({ ...tf, remarks: e.target.value }));
+                      }
+                  }}
                   disabled={disableAll}
-                  placeholder="Optional details..."
+                  placeholder="What did you work on?"
+                  maxLength={500}
+                  rows={9}
+                  style={{ maxHeight: '13.5rem' }} 
                 />
               </div>
             </div>
+          </div>
 
             {/* Status Footer - Compact */}
             <div className={cn(
@@ -1265,8 +1369,8 @@ const CalendarModal = ({
                             setModalStatus("create");
                             setTimeFields({
                               id: "",
-                              start_time: moment(calendarDate).format("YYYY-MM-DDTHH:mm"),
-                              end_time: moment(calendarDate).add(1, 'hour').format("YYYY-MM-DDTHH:mm"), // Optional default duration
+                              start_time: "",
+                              end_time: "",
                               is_ot: false,
                               next_day_ot: false,
                               ot_type: "",
@@ -1402,7 +1506,7 @@ const CalendarModal = ({
             </div>
 
             {/* Calendar Container */}
-            <div className="flex-1 px-4 overflow-y-auto min-h-0 relative mb-4">
+            <div className="flex-1 px-4 overflow-y-auto min-h-0 relative mb-4" style={{ minHeight: 0 }}>
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden h-full">
                 {/* We force h-full on wrapper, but RBC needs specific height. We can use flex-1 */}
                 <style>
@@ -1861,7 +1965,7 @@ const CalendarModal = ({
     };
 
     return (
-      <div className="hidden md:block w-auto max-h-[500px] overflow-y-auto relative">
+      <div className="hidden md:block w-auto overflow-y-auto relative" style={{ maxHeight: 'calc(85vh - 160px)' }}>
         <DragAndDropCalendar
           localizer={localizer}
           events={calendarEvents}
@@ -1991,22 +2095,24 @@ const CalendarModal = ({
 
   // Minimal, modern modal layout
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-[1000px] h-auto max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between border-b px-5 py-3 flex-shrink-0 bg-white z-10">
-          <h2 className="text-base font-semibold tracking-tight text-gray-900">{getModalTitle()}</h2>
-          <button
-            className="text-gray-400 hover:text-gray-900 transition-colors p-1 rounded-full hover:bg-gray-100"
-            onClick={onClose}
-          >
-            <X size={18} />
-          </button>
-        </div>
-        <div className="flex-1 min-h-0 overflow-hidden">
-          {modalType === "timeCharge" ? renderTimeChargeForm() : null}
+    <TooltipProvider delayDuration={0}>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-[1000px] max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <div className="flex items-center justify-between border-b px-5 py-3 flex-shrink-0 bg-white z-10">
+            <h2 className="text-base font-semibold tracking-tight text-gray-900">{getModalTitle()}</h2>
+            <button
+              className="text-gray-400 hover:text-gray-900 transition-colors p-1 rounded-full hover:bg-gray-100"
+              onClick={onClose}
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 overflow-hidden">
+            {modalType === "timeCharge" ? renderTimeChargeForm() : null}
+          </div>
         </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 };
 

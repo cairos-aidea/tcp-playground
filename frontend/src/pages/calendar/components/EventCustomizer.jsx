@@ -198,12 +198,25 @@ const EventCustomizer = ({ view, event, showDragHandles = false }) => {
           {title}
         </div>
 
-        {/* Subtitle */}
-        {subtitle && (
+        {/* Subtitle: stage and activity on separate rows */}
+        {event.type === "timeCharge" && event.chargeType === "external" ? (
+          <>
+            {event.stage_label && (
+              <div className={cn("text-[10px] mt-0.5 leading-tight line-clamp-1 opacity-90", styles.subtext)}>
+                {event.stage_label}
+              </div>
+            )}
+            {event.activity && (
+              <div className={cn("text-[10px] leading-tight line-clamp-1 opacity-80", styles.subtext)}>
+                {event.activity}
+              </div>
+            )}
+          </>
+        ) : (subtitle && (
           <div className={cn("text-[10px] mt-0.5 leading-tight line-clamp-2", styles.subtext)}>
             {subtitle}
           </div>
-        )}
+        ))}
 
         {/* Bottom resize handle indicator — shown only when drag handles are enabled and event is selected AND editable */}
         {showDragHandles && event.isCurrent && isEditable && (
@@ -212,6 +225,21 @@ const EventCustomizer = ({ view, event, showDragHandles = false }) => {
               <div className="w-5 h-[2px] rounded-full bg-current opacity-40" />
               <div className="w-5 h-[2px] rounded-full bg-current opacity-40" />
             </div>
+          </div>
+        )}
+
+        {/* Overtime Badge */}
+        {event.is_ot && (
+          <div className="absolute right-1.5 bottom-1.5 z-10">
+            <span className={cn(
+              "text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border opacity-90",
+              styles.border, // Use the card border color for the badge border
+              styles.text // Use the text color for the badge text
+            )}
+              style={{ backgroundColor: "rgba(255,255,255,0.3)" }} // Subtle semi-transparent background
+            >
+              Overtime
+            </span>
           </div>
         )}
       </div>

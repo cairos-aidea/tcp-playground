@@ -4,6 +4,11 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Remove blue focus outline from interactive elements */
+*:focus {
+  outline: none;
+}
+
 :root {
   /* Exact Tokens from Reference Repo app.css */
   --background: #f6f6f7;
