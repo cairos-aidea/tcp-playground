@@ -1034,7 +1034,7 @@ const CalendarModal = ({
               {/* Recent Inputs */}
               {(function() {
                  const visibleRecents = recentExternalInputs.filter(item => Number(item.id) > lastClearedThreshold);
-                 if (timeFields.option !== "external" || formExternal.status === "approved" || visibleRecents.length === 0 || hideRecents) return null;
+                 if (timeFields.option !== "external" || ["approved", "declined"].includes((formExternal.status || "").toLowerCase()) || visibleRecents.length === 0 || hideRecents) return null;
 
                  return (
                 <div className="mb-1">
