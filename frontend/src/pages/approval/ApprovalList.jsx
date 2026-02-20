@@ -38,11 +38,12 @@ const formatDate = (dateString) => {
   });
 };
 
-// Helper for formatting time (HH:MM -> 12h AM/PM)
+// Helper for formatting time (handles both "HH:MM:SS" and full datetime "YYYY-MM-DD HH:MM:SS")
 const formatTime = (timeStr) => {
   if (!timeStr) return '';
-  // Expecting "HH:MM" or "HH:MM:SS"
-  const [hour, minute] = timeStr.split(':');
+  // If it's a full datetime string, extract only the time part
+  const timePart = timeStr.includes(' ') ? timeStr.split(' ').pop() : timeStr;
+  const [hour, minute] = timePart.split(':');
   let h = parseInt(hour, 10);
   const ampm = h >= 12 ? 'PM' : 'AM';
   h = h % 12 || 12;

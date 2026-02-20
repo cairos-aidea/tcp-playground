@@ -327,17 +327,26 @@ const Calendar = () => {
       });
       return;
     }
-    // Prepare payload for edit
-    let payload = { ...event };
-    payload.start_time = moment(start).format("YYYY-MM-DDTHH:mm");
-    payload.end_time = moment(end).format("YYYY-MM-DDTHH:mm");
-    if (event.chargeType === "external") {
-      payload = { ...timeFields, ...formExternal, ...payload, time_charge_type: 1 };
-    } else if (event.chargeType === "internal") {
-      payload = { ...timeFields, ...formInternal, ...payload, time_charge_type: 2 };
-    } else if (event.chargeType === "departmental") {
-      payload = { ...timeFields, ...formDepartmental, ...payload, time_charge_type: 3 };
-    }
+    // Build payload directly from the event — never use modal form state (timeFields/formExternal etc.)
+    // which may be stale from a previous modal interaction
+    const payload = {
+      id: event.originalId || event.id,
+      start_time: moment(start).format("YYYY-MM-DDTHH:mm"),
+      end_time: moment(end).format("YYYY-MM-DDTHH:mm"),
+      is_ot: event.is_ot,
+      next_day_ot: event.next_day_ot,
+      ot_type: event.ot_type || "",
+      remarks: event.remarks || "",
+      project_id: event.project_id,
+      project_code: event.project_code,
+      project_label: event.project_label,
+      stage_id: event.stage_id,
+      stage_label: event.stage_label,
+      departmental_task_id: event.departmental_task_id,
+      activity: event.activity,
+      status: event.status,
+      time_charge_type: event.chargeType === "external" ? 1 : event.chargeType === "internal" ? 2 : event.chargeType === "departmental" ? 3 : "",
+    };
     promiseNotification(
       handleSave(payload, "drop"),
       {
@@ -361,17 +370,26 @@ const Calendar = () => {
       });
       return;
     }
-    // Prepare payload for edit
-    let payload = { ...event };
-    payload.start_time = moment(start).format("YYYY-MM-DDTHH:mm");
-    payload.end_time = moment(end).format("YYYY-MM-DDTHH:mm");
-    if (event.chargeType === "external") {
-      payload = { ...timeFields, ...formExternal, ...payload, time_charge_type: 1 };
-    } else if (event.chargeType === "internal") {
-      payload = { ...timeFields, ...formInternal, ...payload, time_charge_type: 2 };
-    } else if (event.chargeType === "departmental") {
-      payload = { ...timeFields, ...formDepartmental, ...payload, time_charge_type: 3 };
-    }
+    // Build payload directly from the event — never use modal form state (timeFields/formExternal etc.)
+    // which may be stale from a previous modal interaction
+    const payload = {
+      id: event.originalId || event.id,
+      start_time: moment(start).format("YYYY-MM-DDTHH:mm"),
+      end_time: moment(end).format("YYYY-MM-DDTHH:mm"),
+      is_ot: event.is_ot,
+      next_day_ot: event.next_day_ot,
+      ot_type: event.ot_type || "",
+      remarks: event.remarks || "",
+      project_id: event.project_id,
+      project_code: event.project_code,
+      project_label: event.project_label,
+      stage_id: event.stage_id,
+      stage_label: event.stage_label,
+      departmental_task_id: event.departmental_task_id,
+      activity: event.activity,
+      status: event.status,
+      time_charge_type: event.chargeType === "external" ? 1 : event.chargeType === "internal" ? 2 : event.chargeType === "departmental" ? 3 : "",
+    };
     promiseNotification(
       handleSave(payload, "resize"),
       {
@@ -1107,9 +1125,16 @@ const Calendar = () => {
       setLoading(true);
       try {
         let apiResult;
-        if (modalType === "timeCharge") {
+        // For drop/resize, always treat as timeCharge update — don't depend on modalType
+        // which is modal-related state that may be stale
+        const isDnD = ["drop", "resize"].includes(mode);
+        const effectiveType = isDnD ? "timeCharge" : modalType;
+
+        if (effectiveType === "timeCharge") {
           if (["edit", "drop", "resize"].includes(mode)) {
-            apiResult = await api("time_charge_update", { ...headerReq, id: timeFields.id ? timeFields.id : payload.id }, payload);
+            // For DnD, always use payload.id (self-contained); for modal edits, prefer timeFields.id
+            const recordId = isDnD ? payload.id : (timeFields.id || payload.id);
+            apiResult = await api("time_charge_update", { ...headerReq, id: recordId }, payload);
             if (apiResult?.regular || apiResult?.id) {
               // Use the year/month of the edited time_charge, not always today
               const eventStart = payload.start_time || timeFields.start_time;
