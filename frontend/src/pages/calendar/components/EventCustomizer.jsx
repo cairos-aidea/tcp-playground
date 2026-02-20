@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CircleCheck, CircleX, Clock, DatabaseBackup, Hourglass, Calendar as CalendarIcon } from "lucide-react";
 import moment from "moment";
 import { cn } from "@/lib/utils";
+import { createPortal } from "react-dom";
 
 const EventCustomizer = ({ view, event, showDragHandles = false }) => {
   const containerRef = useRef(null);
@@ -14,6 +15,35 @@ const EventCustomizer = ({ view, event, showDragHandles = false }) => {
       }, 100);
     }
   }, [event.isCurrent]);
+
+  // HACK: Recursively remove title attribute from parent elements to prevent native tooltip
+  useEffect(() => {
+    if (containerRef.current) {
+      // Traverse up to find any element with a title attribute
+      let el = containerRef.current.parentElement;
+      while (el && el !== document.body) {
+        if (el.getAttribute("title")) {
+          el.removeAttribute("title");
+        }
+        // Also observe for changes if RBC re-adds it
+        if (el.classList.contains("rbc-event") || el.classList.contains("rbc-day-slot") || el.classList.contains("rbc-row-segment")) {
+           const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+              if (mutation.type === "attributes" && mutation.attributeName === "title") {
+                const title = el.getAttribute("title");
+                if (title) el.removeAttribute("title");
+              }
+            });
+          });
+          observer.observe(el, { attributes: true });
+        }
+        
+        el = el.parentElement;
+        // Stop if we go too far up (e.g., past the row/cell)
+        if (el && (el.classList.contains("rbc-row") || el.classList.contains("rbc-month-view"))) break;
+      }
+    }
+  }, []);
 
   if (event.source === "SYNC-SP-LIST" && (view === "day" || view === "week")) {
     return null;
@@ -112,11 +142,118 @@ const EventCustomizer = ({ view, event, showDragHandles = false }) => {
   if (event.status === 'declined') Icon = CircleX;
   if (event.type === 'leave') Icon = CalendarIcon;
 
+  // Tooltip Content
+  const tooltipContent = (
+    <div className="flex flex-col gap-1 min-w-[200px] max-w-[300px]">
+        {/* Header */}
+        <div className="border-b border-zinc-700 pb-2 mb-1">
+            <div className="font-bold text-sm text-white leading-tight">
+                {title}
+            </div>
+            {(event.stage_label || subtitle) && (
+                <div className="text-xs text-zinc-400 mt-0.5">
+                   {event.stage_label ? `${event.stage_label} ${event.activity ? `• ${event.activity}` : ''}` : subtitle}
+                </div>
+            )}
+        </div>
+        
+        {/* Body */}
+        <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs text-zinc-300">
+             <span className="text-zinc-500 font-medium">Time:</span>
+             <div className="flex items-center gap-2">
+                <span className="font-mono text-zinc-200">{startStr} – {endStr}</span>
+                {event.is_ot && (
+                    <span className="text-amber-400 font-bold text-[10px] uppercase tracking-wide border border-amber-400/30 bg-amber-400/10 px-1.5 rounded-sm">
+                        OVERTIME
+                    </span>
+                )}
+             </div>
+             
+             <span className="text-zinc-500 font-medium">Duration:</span>
+             <span className="text-zinc-200">{durationStr}</span>
+
+             <span className="text-zinc-500 font-medium">Status:</span>
+             <span className={cn(
+                 "font-medium capitalize",
+                 event.status === 'approved' ? "text-emerald-400" :
+                 event.status === 'declined' ? "text-red-400" : "text-zinc-200"
+             )}>
+                 {event.status || 'Pending'}
+             </span>
+        </div>
+
+        {/* Remarks Footer */}
+        {event.remarks && (
+            <div className="mt-2 pt-2 border-t border-zinc-800 text-xs text-zinc-400 italic">
+                "{event.remarks}"
+            </div>
+        )}
+    </div>
+  );
+
+  // ── Custom Tooltip Logic ──────────────────────────────────────────────
+  const [showTooltip, setShowTooltip] = useState(false);
+  const tooltipRef = useRef(null);
+  const mousePos = useRef({ x: 0, y: 0 });
+  const hoverTimeout = useRef(null);
+
+  const handleMouseEnter = (e) => {
+    // Capture initial position
+    mousePos.current = { x: e.clientX, y: e.clientY };
+    // Start delay
+    hoverTimeout.current = setTimeout(() => {
+      setShowTooltip(true);
+    }, 1000); // 1s delay
+  };
+
+  const handleMouseMove = (e) => {
+    // Update ref immediately
+    mousePos.current = { x: e.clientX, y: e.clientY };
+    
+    // Direct DOM manipulation for butter-smooth performance
+    if (tooltipRef.current) {
+        // Position: Bottom-Right of cursor
+        const x = e.clientX + 10;
+        const y = e.clientY + 25;
+        tooltipRef.current.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+    }
+  };
+
+  const handleMouseLeave = () => {
+    // Clear timeout and hide
+    if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    setShowTooltip(false);
+  };
+
+  // Render portal if visible
+  const TooltipPortal = showTooltip ? createPortal(
+    <div 
+      ref={tooltipRef}
+      className="fixed z-[9999] pointer-events-none"
+      style={{
+        top: 0,
+        left: 0,
+        // Set initial position immediately to avoid jump
+        transform: `translate3d(${mousePos.current.x + 10}px, ${mousePos.current.y + 25}px, 0)`
+      }}
+    >
+      <div className="bg-zinc-950 border border-zinc-800 text-white shadow-xl p-3 rounded-md animate-in fade-in zoom-in-95 duration-200 origin-top-left">
+        {tooltipContent}
+      </div>
+    </div>,
+    document.body
+  ) : null;
+
   // ── Month view: full card (naturally flowing, not absolute) ───────────
   if (view === "month") {
     return (
-      <div
-        className={cn(
+      <>
+        <div
+          ref={containerRef}
+          onMouseEnter={handleMouseEnter}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+          className={cn(
           "relative w-full p-1.5 flex flex-col rounded-md border text-[10px] leading-snug cursor-pointer",
           styles.bg,
           styles.border
@@ -168,13 +305,22 @@ const EventCustomizer = ({ view, event, showDragHandles = false }) => {
             </span>
           </div>
         )}
-      </div>
+        </div>
+        {TooltipPortal}
+      </>
     );
   }
 
   // ── Day / Week view: full card ─────────────────────────────────────────
   return (
-    <div className="relative w-full h-full group" ref={containerRef}>
+    <>
+      <div 
+        className="relative w-full h-full group" 
+        ref={containerRef}
+        onMouseEnter={handleMouseEnter}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+      >
       <div
         className={cn(
           "absolute inset-0 w-full min-h-full p-2 flex flex-col rounded-md border transition-all duration-200 ease-in-out",
@@ -255,8 +401,10 @@ const EventCustomizer = ({ view, event, showDragHandles = false }) => {
             </span>
           </div>
         )}
+        </div>
       </div>
-    </div>
+      {TooltipPortal}
+    </>
   );
 };
 
