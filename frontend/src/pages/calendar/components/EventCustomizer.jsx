@@ -117,7 +117,7 @@ const EventCustomizer = ({ view, event, showDragHandles = false }) => {
     return (
       <div
         className={cn(
-          "w-full p-1.5 flex flex-col rounded-md border text-[10px] leading-snug cursor-pointer",
+          "relative w-full p-1.5 flex flex-col rounded-md border text-[10px] leading-snug cursor-pointer",
           styles.bg,
           styles.border
         )}
@@ -155,6 +155,19 @@ const EventCustomizer = ({ view, event, showDragHandles = false }) => {
             {subtitle}
           </div>
         ))}
+
+        {/* OT Badge for Month View */}
+        {event.is_ot && (
+          <div className="absolute bottom-1 right-1">
+            <span className={cn(
+              "text-[9px] font-extrabold px-1 rounded border bg-background/50 backdrop-blur-[1px]",
+              styles.border,
+              styles.text
+            )}>
+              OT
+            </span>
+          </div>
+        )}
       </div>
     );
   }
