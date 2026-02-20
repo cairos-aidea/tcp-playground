@@ -17,3 +17,16 @@ export function pendingNotification({ id, title, message }) {
         description: message,
     });
 }
+
+export function promiseNotification(promise, { loadingText, successTitle, successText, errorTitle, errorText }) {
+    return toast.promise(promise, {
+        loading: loadingText || 'Loading...',
+        success: (data) => {
+             // Can be customized based on data returned from the promise
+             return successText || 'Operation completed successfully';
+        },
+        error: (err) => {
+             return errorText || err?.message || 'Something went wrong';
+        },
+    });
+}

@@ -224,6 +224,7 @@
   left: 0 !important;
   right: 0 !important;
   z-index: 60 !important;
+  touch-action: none; /* Prevent browser handling the drag start, but wheel is still allowed globally */
 }
 
 /* While dragging/resizing show correct cursor globally */
@@ -231,7 +232,8 @@
   cursor: grabbing !important;
 }
 
-.rbc-addons-dnd-is-resizing * {
+.rbc-addons-dnd-is-resizing .rbc-addons-dnd-resize-ns-anchor {
+  /* Only apply resizing cursor to the anchor itself rather than everything */
   cursor: ns-resize !important;
 }
 

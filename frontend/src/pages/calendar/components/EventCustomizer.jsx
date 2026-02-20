@@ -9,6 +9,11 @@ const EventCustomizer = ({ view, event, showDragHandles = false }) => {
 
   useEffect(() => {
     if (event.isCurrent && containerRef.current) {
+      // Don't fight the user's manual scroll during resize/drag
+      const isDnD = document.body.classList.contains('rbc-addons-dnd-is-resizing') || 
+                     document.body.classList.contains('rbc-addons-dnd-is-dragging');
+      if (isDnD) return;
+
       // Small delay to ensure render is complete
       setTimeout(() => {
         containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -27,11 +32,20 @@ const EventCustomizer = ({ view, event, showDragHandles = false }) => {
         }
         // Also observe for changes if RBC re-adds it
         if (el.classList.contains("rbc-event") || el.classList.contains("rbc-day-slot") || el.classList.contains("rbc-row-segment")) {
-           const observer = new MutationObserver((mutations) => {
+          // Remove draggable to prevent full card dragging, leaving only resize anchors draggable natively
+          if (el.classList.contains("rbc-event") && el.hasAttribute("draggable")) {
+             el.removeAttribute("draggable");
+          }
+          
+          const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
-              if (mutation.type === "attributes" && mutation.attributeName === "title") {
-                const title = el.getAttribute("title");
-                if (title) el.removeAttribute("title");
+              if (mutation.type === "attributes") {
+                if (mutation.attributeName === "title" && el.getAttribute("title")) {
+                  el.removeAttribute("title");
+                }
+                if (mutation.attributeName === "draggable" && el.classList.contains("rbc-event") && el.getAttribute("draggable")) {
+                  el.removeAttribute("draggable");
+                }
               }
             });
           });
@@ -323,7 +337,7 @@ const EventCustomizer = ({ view, event, showDragHandles = false }) => {
       >
       <div
         className={cn(
-          "absolute inset-0 w-full min-h-full p-2 flex flex-col rounded-md border transition-all duration-200 ease-in-out",
+          "absolute inset-0 w-full min-h-full p-2 flex flex-col rounded-md border transition-all duration-200 ease-in-out cursor-pointer",
           "hover:shadow-[0_0_14px_4px_rgba(0,0,0,0.18)] hover:z-50",
           styles.bg,
           styles.border

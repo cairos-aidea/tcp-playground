@@ -3,7 +3,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import moment from 'moment';
 import "moment-timezone";
 import { Calendar as BaseCalendar, momentLocalizer } from 'react-big-calendar';
+import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
+
+const DragAndDropCalendar = withDragAndDrop(BaseCalendar);
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import { api } from '../../api/api';
 import { useAppData } from '../../context/AppDataContext';
@@ -11,7 +14,7 @@ import EventCustomizer from './components/EventCustomizer';
 import { CustomMonthHeader, CustomWeekHeader } from './components/CustomHeader';
 import CustomDateHeader from './components/CustomDateHeader';
 import CalendarModal from './components/CalendarModal';
-import { errorNotification, successNotification, pendingNotification } from '../../components/notifications/notifications';
+import { errorNotification, successNotification, pendingNotification, promiseNotification } from '../../components/notifications/notifications';
 import CalendarToolbar from './components/CalendarToolbar';
 import CalendarLegend from './components/CalendarLegend';
 import CursorTimeTooltip from './components/CursorTimeTooltip';
@@ -104,6 +107,12 @@ const Calendar = () => {
   const [inputErrors, setInputErrors] = useState({});
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
+  // Refs so that cached DnD HOC component functions always read current values
+  const currentViewRef = useRef(currentView);
+  currentViewRef.current = currentView;
+  const windowWidthRef = useRef(windowWidth);
+  windowWidthRef.current = windowWidth;
+
   const [timeEntryStats, setTimeEntryStats] = useState({});
   const [showSidebarOptions, setShowSidebarOptions] = useState('filter');
   const [showFilters, setShowFilters] = useState(false);
@@ -154,10 +163,161 @@ const Calendar = () => {
     return errors;
   };
 
-  // Handler for event drag
+
+  // Buttery Smooth Auto-Scroller for Resizing/Dragging Edges
+  useEffect(() => {
+    const scrollContainer = document.querySelector('.rbc-time-content');
+    if (!scrollContainer) return;
+
+    // Track whether a DnD resize/drag is active via the calendar wrapper class
+    let isDnDActive = false;
+
+    // Watch for the 'rbc-addons-dnd-is-dragging' class on the calendar wrapper
+    const calendarWrapper = document.querySelector('.rbc-addons-dnd');
+    let observer = null;
+    if (calendarWrapper) {
+      observer = new MutationObserver((mutations) => {
+        for (const m of mutations) {
+          if (m.attributeName === 'class') {
+            isDnDActive = calendarWrapper.classList.contains('rbc-addons-dnd-is-dragging');
+          }
+        }
+      });
+      observer.observe(calendarWrapper, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    // --- Intercept scrollTop to block library's forced scroll during DnD ---
+    const originalScrollTop = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+
+    if (originalScrollTop && !Element.prototype._isIntercepted) {
+      Element.prototype._isIntercepted = true;
+
+      Object.defineProperty(Element.prototype, 'scrollTop', {
+        get() {
+          return originalScrollTop.get.call(this);
+        },
+        set(value) {
+          // Block library auto-scroll on the time-content container during DnD
+          if (isDnDActive && !this._isCustomScroll) {
+            if (this.classList && (this.classList.contains('rbc-time-content') || this.closest?.('.rbc-time-content'))) {
+              return;
+            }
+          }
+          originalScrollTop.set.call(this, value);
+        },
+        configurable: true
+      });
+
+      Element.prototype.scrollIntoView = function(arg) {
+        if (isDnDActive && !this._isCustomScroll) {
+          if (this.closest?.('.rbc-time-content') || this.classList?.contains?.('rbc-time-content')) {
+            return;
+          }
+        }
+        return originalScrollIntoView.apply(this, arguments);
+      };
+    }
+
+    // --- Mouse wheel scrolling during DnD ---
+    let rafId = null;
+    let autoScrollSpeed = 0;
+
+    const handleWheel = (e) => {
+      if (!isDnDActive) return;
+
+
+      if (scrollContainer) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        scrollContainer._isCustomScroll = true;
+        scrollContainer.scrollTop += e.deltaY;
+        scrollContainer._isCustomScroll = false;
+      }
+    };
+
+    // --- Edge-proximity auto-scroll during DnD ---
+    const handleMouseMove = (e) => {
+      if (!isDnDActive) {
+        autoScrollSpeed = 0;
+        return;
+      }
+
+      const rect = scrollContainer.getBoundingClientRect();
+      const mouseY = e.clientY;
+      const threshold = 80;
+      const maxSpeed = 20;
+
+      if (mouseY > rect.top && mouseY < rect.top + threshold) {
+        const distance = threshold - (mouseY - rect.top);
+        autoScrollSpeed = -Math.round((distance / threshold) * maxSpeed);
+      } else if (mouseY < rect.bottom && mouseY > rect.bottom - threshold) {
+        const distance = threshold - (rect.bottom - mouseY);
+        autoScrollSpeed = Math.round((distance / threshold) * maxSpeed);
+      } else if (mouseY <= rect.top) {
+        autoScrollSpeed = -maxSpeed;
+      } else if (mouseY >= rect.bottom) {
+        autoScrollSpeed = maxSpeed;
+      } else {
+        autoScrollSpeed = 0;
+      }
+    };
+
+    const handleMouseUp = () => {
+      autoScrollSpeed = 0;
+    };
+
+    const performAutoScroll = () => {
+      if (autoScrollSpeed !== 0 && scrollContainer) {
+        scrollContainer._isCustomScroll = true;
+        scrollContainer.scrollTop += autoScrollSpeed;
+        scrollContainer._isCustomScroll = false;
+      }
+      rafId = requestAnimationFrame(performAutoScroll);
+    };
+
+    window.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+    window.addEventListener('mousemove', handleMouseMove, { capture: true });
+    window.addEventListener('mouseup', handleMouseUp, { capture: true });
+
+    rafId = requestAnimationFrame(performAutoScroll);
+
+    return () => {
+      window.removeEventListener('wheel', handleWheel, { capture: true });
+      window.removeEventListener('mousemove', handleMouseMove, { capture: true });
+      window.removeEventListener('mouseup', handleMouseUp, { capture: true });
+      if (rafId) cancelAnimationFrame(rafId);
+      if (observer) observer.disconnect();
+
+      if (Element.prototype._isIntercepted) {
+        delete Element.prototype._isIntercepted;
+        if (originalScrollTop) {
+          Object.defineProperty(Element.prototype, 'scrollTop', originalScrollTop);
+        }
+        if (originalScrollIntoView) {
+          Element.prototype.scrollIntoView = originalScrollIntoView;
+        }
+      }
+    };
+  }, []);
+
+  // Handler for event drag (Moving the block entirely)
   const handleEventDrop = async ({ event, start, end }) => {
     // Only allow edit for editable events
     if (event.status && ["approved", "declined"].includes((event.status || "").toLowerCase())) return;
+    
+    // Explicitly block moving entire card blocks across time slots
+    const originalDuration = moment(event.end).diff(moment(event.start));
+    const newDuration = moment(end).diff(moment(start));
+    if (originalDuration === newDuration && (start.getTime() !== new Date(event.start).getTime())) {
+      errorNotification({
+        title: "Move Disabled",
+        message: "Time charges cannot be moved. Please resize the top and bottom edges instead.",
+      });
+      return;
+    }
+
     // Validate
     const errors = validateEventChange(event.id, start, end);
     if (Object.keys(errors).length > 0) {
@@ -178,11 +338,14 @@ const Calendar = () => {
     } else if (event.chargeType === "departmental") {
       payload = { ...timeFields, ...formDepartmental, ...payload, time_charge_type: 3 };
     }
-    pendingNotification({
-      title: "Time Charge Updating",
-      message: "Your time charge is being updated.",
-    });
-    await handleSave(payload, "edit");
+    promiseNotification(
+      handleSave(payload, "drop"),
+      {
+        loadingText: "Updating time charge...",
+        successText: "Time charge updated successfully.",
+        errorText: "Failed to update time charge."
+      }
+    );
   };
 
   // Handler for event resize
@@ -209,11 +372,14 @@ const Calendar = () => {
     } else if (event.chargeType === "departmental") {
       payload = { ...timeFields, ...formDepartmental, ...payload, time_charge_type: 3 };
     }
-    pendingNotification({
-      title: "Time Charge Updating",
-      message: "Your time charge is being updated.",
-    });
-    await handleSave(payload, "edit");
+    promiseNotification(
+      handleSave(payload, "resize"),
+      {
+        loadingText: "Updating time charge...",
+        successText: "Time charge updated successfully.",
+        errorText: "Failed to update time charge."
+      }
+    );
   };
 
   const yearEventsCache = useRef({});
@@ -936,67 +1102,89 @@ const Calendar = () => {
   };
 
   const handleSave = async (payload, mode) => {
-    setLoading(true);
-    try {
-      let apiResult;
-      if (modalType === "timeCharge") {
-        if (mode === "edit") {
-          apiResult = await api("time_charge_update", { ...headerReq, id: timeFields.id ? timeFields.id : payload.id }, payload);
-          if (apiResult?.regular || apiResult?.id) {
-            // Use the year/month of the edited time_charge, not always today
-            const eventStart = payload.start_time || timeFields.start_time;
-            const year = eventStart ? moment(eventStart).year() : moment().year();
-            const month = eventStart ? moment(eventStart).month() + 1 : moment().month() + 1;
-            const cacheKey = `${year}-${month}`;
-            if (yearEventsCache.current[cacheKey]) {
-              delete yearEventsCache.current[cacheKey];
+    // Wrapper for handleSave execution that returns the promise outcome for the toast notification
+    return new Promise(async (resolve, reject) => {
+      setLoading(true);
+      try {
+        let apiResult;
+        if (modalType === "timeCharge") {
+          if (["edit", "drop", "resize"].includes(mode)) {
+            apiResult = await api("time_charge_update", { ...headerReq, id: timeFields.id ? timeFields.id : payload.id }, payload);
+            if (apiResult?.regular || apiResult?.id) {
+              // Use the year/month of the edited time_charge, not always today
+              const eventStart = payload.start_time || timeFields.start_time;
+              const year = eventStart ? moment(eventStart).year() : moment().year();
+              const month = eventStart ? moment(eventStart).month() + 1 : moment().month() + 1;
+              const cacheKey = `${year}-${month}`;
+              if (yearEventsCache.current[cacheKey]) {
+                delete yearEventsCache.current[cacheKey];
+              }
+              const allEvents = await fetchEventsForYearMonth(year, month);
+              setEvents(allEvents);
+              queryClient.invalidateQueries({ queryKey: ['approvals'] });
+              
+              // Only trigger discrete success notification if not triggered by the promise toast
+              if (!["drop", "resize"].includes(mode)) {
+                successNotification({ title: "Success", message: "Time charge updated successfully." });
+              }
+              resolve(apiResult);
+            } else {
+              if (!["drop", "resize"].includes(mode)) {
+                errorNotification({ title: "Error", message: apiResult?.message || "Failed to update time charge. Please try again." });
+              }
+              reject(new Error(apiResult?.message || "Failed to update time charge."));
+              return;
             }
-            const allEvents = await fetchEventsForYearMonth(year, month);
-            setEvents(allEvents);
-            queryClient.invalidateQueries({ queryKey: ['approvals'] });
-            successNotification({ title: "Success", message: "Time charge updated successfully." });
           } else {
-            errorNotification({ title: "Error", message: apiResult?.message || "Failed to update time charge. Please try again." });
-            return;
-          }
-        } else {
-          apiResult = await api("time_charge_create", headerReq, payload);
-          if (apiResult?.regular || apiResult?.id) {
-            // Use the year/month of the created time_charge, not always today
-            const eventStart = payload.start_time;
-            const year = eventStart ? moment(eventStart).year() : moment().year();
-            const month = eventStart ? moment(eventStart).month() + 1 : moment().month() + 1;
-            const cacheKey = `${year}-${month}`;
-            if (yearEventsCache.current[cacheKey]) {
-              delete yearEventsCache.current[cacheKey];
+            apiResult = await api("time_charge_create", headerReq, payload);
+            if (apiResult?.regular || apiResult?.id) {
+              // Use the year/month of the created time_charge, not always today
+              const eventStart = payload.start_time;
+              const year = eventStart ? moment(eventStart).year() : moment().year();
+              const month = eventStart ? moment(eventStart).month() + 1 : moment().month() + 1;
+              const cacheKey = `${year}-${month}`;
+              if (yearEventsCache.current[cacheKey]) {
+                delete yearEventsCache.current[cacheKey];
+              }
+              const allEvents = await fetchEventsForYearMonth(year, month);
+              setEvents(allEvents);
+              queryClient.invalidateQueries({ queryKey: ['approvals'] });
+              
+              if (!["drop", "resize"].includes(mode)) {
+                successNotification({ title: "Success", message: "Time charge created successfully." });
+              }
+              // Clear start/end times after successful creation so the dragged range doesn't persist
+              setTimeFields(tf => ({ ...tf, start_time: "", end_time: "" }));
+              resolve(apiResult);
+            } else {
+               if (!["drop", "resize"].includes(mode)) {
+                errorNotification({ title: "Error", message: apiResult?.message || "Failed to create time charge. Please try again." });
+              }
+              reject(new Error(apiResult?.message || "Failed to create time charge."));
+              return;
             }
-            const allEvents = await fetchEventsForYearMonth(year, month);
-            setEvents(allEvents);
-            queryClient.invalidateQueries({ queryKey: ['approvals'] });
-            successNotification({ title: "Success", message: "Time charge created successfully." });
-            // Clear start/end times after successful creation so the dragged range doesn't persist
-            setTimeFields(tf => ({ ...tf, start_time: "", end_time: "" }));
-          } else {
-            errorNotification({ title: "Error", message: apiResult?.message || "Failed to create time charge. Please try again." });
-            return;
           }
+        } else if (modalType === "leave") {
+          if (mode === "edit") {
+            // await api.put(`/leaves/${formLeave.id}`, payload, headerReq());
+          } else {
+            // await api.post("/leaves", payload, headerReq());
+          }
+          resolve(true);
         }
-      } else if (modalType === "leave") {
-        if (mode === "edit") {
-          // await api.put(`/leaves/${formLeave.id}`, payload, headerReq());
-        } else {
-          // await api.post("/leaves", payload, headerReq());
-        }
-      }
 
-      // Don't close modal — let user continue navigating days
-      // closeModal();
-    } catch (err) {
-      console.error("Save error:", err);
-      errorNotification({ title: "Error", message: "Something went wrong while saving. Please try again." });
-    } finally {
-      setLoading(false);
-    }
+        // Don't close modal — let user continue navigating days
+        // closeModal();
+      } catch (err) {
+        console.error("Save error:", err);
+         if (!["drop", "resize"].includes(mode)) {
+          errorNotification({ title: "Error", message: "Something went wrong while saving. Please try again." });
+        }
+        reject(err);
+      } finally {
+        setLoading(false);
+      }
+    });
   };
 
   const [dayTotals, setDayTotals] = useState({});
@@ -1051,8 +1239,12 @@ const Calendar = () => {
     return dayTotals[key] || { regular: 0, ot: 0 };
   };
 
+  // Ref so the cached DnD component function always reads the latest getDayTotals
+  const getDayTotalsRef = useRef(getDayTotals);
+  getDayTotalsRef.current = getDayTotals;
+
   const CustomDateHeaderWrapper = (props) => (
-    <CustomDateHeader {...props} getDayTotals={getDayTotals} isMobile={windowWidth < 640} />
+    <CustomDateHeader {...props} getDayTotals={getDayTotalsRef.current} isMobile={windowWidthRef.current < 640} />
   );
 
   // Stable toolbar: store dynamic props in a ref so the component reference never changes
@@ -1127,7 +1319,7 @@ const Calendar = () => {
             )}
 
             <div className="h-full p-4">
-              <BaseCalendar
+              <DragAndDropCalendar
                 localizer={localizer}
                 events={filteredEvents}
                 selectable={true}
@@ -1146,10 +1338,10 @@ const Calendar = () => {
                 onNavigate={(date) => { handleYearChange(date); }}
                 onEventDrop={['day', 'week'].includes(currentView) ? handleEventDrop : undefined}
                 onEventResize={['day', 'week'].includes(currentView) ? handleEventResize : undefined}
-                draggableAccessor={['day', 'week'].includes(currentView) ? (event => !event.status || !["approved", "declined"].includes((event.status || "").toLowerCase())) : undefined}
-                resizableAccessor={['day', 'week'].includes(currentView) ? (event => !event.status || !["approved", "declined"].includes((event.status || "").toLowerCase())) : undefined}
+                draggableAccessor={['day', 'week'].includes(currentView) ? (event => !event.status || !["approved", "declined"].includes((event.status || "").toLowerCase())) : (() => false)}
+                resizableAccessor={['day', 'week'].includes(currentView) ? (event => !event.status || !["approved", "declined"].includes((event.status || "").toLowerCase())) : (() => false)}
                 components={{
-                  event: (props) => <EventCustomizer {...props} view={currentView} event={props.event} />,
+                  event: (props) => <EventCustomizer {...props} view={currentViewRef.current} event={props.event} />,
                   month: {
                     dateHeader: CustomDateHeaderWrapper,
                     header: (props) => <CustomMonthHeader {...props} />
