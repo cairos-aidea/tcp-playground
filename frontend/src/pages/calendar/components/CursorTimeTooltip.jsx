@@ -63,8 +63,8 @@ const CursorTimeTooltip = ({ selecting, start, end }) => {
     const endStr = endMoment.format('h:mm A');
 
     // Prevent tooltip from going off-screen
-    const offsetX = 16;
-    const offsetY = -42;
+    const offsetX = 10;
+    const offsetY = 15;
     const tooltipWidth = 220;
     const windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
     const adjustedX = pos.x + offsetX + tooltipWidth > windowWidth

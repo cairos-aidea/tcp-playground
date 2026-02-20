@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { Check, ChevronsUpDown } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Reusable searchable combobox styled to match shadcn Select triggers
 const FilterCombobox = ({ value, onSelect, options, placeholder, width = "w-[160px]", displayFn }) => {
@@ -204,19 +205,18 @@ const CalendarFilters = ({ filters, setFilters, filterOptions }) => {
                 />
 
                 {/* Overtime Filter */}
-                <div className="w-[110px] shrink-0">
-                    <Select
-                        value={filters.isOvertime ? "yes" : "no"}
-                        onValueChange={(val) => handleFilterChange('isOvertime', val === "yes")}
+                <div className="flex items-center space-x-2 bg-background border border-input rounded-md h-8 px-3 shrink-0 shadow-xs">
+                    <Checkbox 
+                        id="overtime-filter" 
+                        checked={filters.isOvertime}
+                        onCheckedChange={(checked) => handleFilterChange('isOvertime', checked)}
+                    />
+                    <label 
+                        htmlFor="overtime-filter" 
+                        className="text-[11px] font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer select-none"
                     >
-                        <SelectTrigger className="h-8 text-[11px] bg-background">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="no">No Overtime</SelectItem>
-                            <SelectItem value="yes">Overtime</SelectItem>
-                        </SelectContent>
-                    </Select>
+                        Overtime
+                    </label>
                 </div>
             </div>
     );

@@ -2001,10 +2001,12 @@ const CalendarModal = ({
           resizableAccessor={event =>
             !disableDragResize && event.isCurrent
           }
+          tooltipAccessor={() => null}
           components={{
             event: (props) => <EventCustomizer {...props} showDragHandles={true} setInputErrors={setInputErrors} />,
             timeHeader: () => null
           }}
+
           slotPropGetter={(date) => {
             const day = date.getDay(); // 0 = Sunday, 6 = Saturday
             const hour = date.getHours();
@@ -2095,7 +2097,7 @@ const CalendarModal = ({
 
   // Minimal, modern modal layout
   return (
-    <TooltipProvider delayDuration={0}>
+    <TooltipProvider delayDuration={1500}>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
         <div className="bg-white rounded-xl shadow-2xl w-full max-w-[1000px] max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
           <div className="flex items-center justify-between border-b px-5 py-3 flex-shrink-0 bg-white z-10">
